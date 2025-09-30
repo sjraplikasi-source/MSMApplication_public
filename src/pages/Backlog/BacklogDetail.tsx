@@ -229,10 +229,11 @@ const BacklogDetail: React.FC = () => {
         .eq("id", id);
       if (uErr) throw uErr;
 
-      await pushNotif({
+await pushNotif({
   backlog_id: id,
   title: "Backlog ditutup",
-  body: `Backlog ${registrationCode ?? ""} telah ditutup.`,
+  // AMBIL registration_code DARI STATE 'b'
+  body: `Backlog ${b.registration_code ?? ""} telah ditutup.`,
   target_role: "planner",
 });
       
