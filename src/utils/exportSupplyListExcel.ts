@@ -59,7 +59,8 @@ export const exportSupplyListExcel = async (filters: SupplyListFilters) => {
             .order("date", { ascending: false });
 
         // Terapkan filter dari UI
-        if (filters.statusFilter === "validated_reviewed") query = query.in("status", ["reviewed"]);
+        //if (filters.statusFilter === "validated_reviewed") query = query.in("status", ["reviewed"]);
+      if (filters.statusFilter === "validated_reviewed") query = query.in("status", ["validated", "reviewed"]);
         if (filters.q) {
             const p = `%${filters.q}%`;
             query = query.or(`registration_code.ilike.${p},unit_code.ilike.${p},problem.ilike.${p}`);
