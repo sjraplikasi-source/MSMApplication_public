@@ -1,4 +1,4 @@
-// src/pages/Backlog/BacklogList.tsx (HASIL UPGRADE)
+// src/pages/Backlog/BacklogList.tsx (LENGKAP & FINAL)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -34,7 +34,22 @@ const PART_STATUS_OPTIONS = ["all", "complete", "waiting"] as const;
 const SHUTDOWN_OPTIONS = ["all", "true", "false"] as const;
 
 // --- Komponen Status ---
-const SupplyStatusBadge: React.FC<{ backlog: BacklogRow }> = ({ backlog }) => { /* ... (Tidak ada perubahan) ... */ };
+const SupplyStatusBadge: React.FC<{ backlog: BacklogRow }> = ({ backlog }) => {
+  const statusResult = useMemo(() => {
+    if (!backlog.need_sparepart) return { text: "Tanpa Part", color: "bg-gray-100 text-gray-700 border border-gray-200" };
+    if (!backlog.supply_updated_at) return { text: "Perlu Update", color: "bg-amber-50 text-amber-700 border border-amber-200" };
+    const parts = backlog.backlog_spareparts || [];
+    if (parts.length === 0) return { text: "Sudah Update", color: "bg-green-50 text-green-700 border border-green-200" };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isOverdue = parts.some(part => part.estimated_ready_date && new Date(part.estimated_ready_date) < today);
+    if (isOverdue) return { text: "Perlu Update Estimasi", color: "bg-red-50 text-red-700 border border-red-200" };
+    const readyParts = parts.filter(p => p.stock_status?.toLowerCase() === 'ready').length;
+    if (parts.length > 0 && readyParts === parts.length) return { text: "Semua Part Ready", color: "bg-blue-50 text-blue-700 border border-blue-200" };
+    if (readyParts > 0) return { text: "Ready Parsial", color: "bg-purple-50 text-purple-700 border border-purple-200" };
+    return { text: "Sudah Update", color: "bg-green-50 text-green-700 border border-green-200" };
+  }, [backlog]);
+  return <span className={`px-2 py-1 text-xs rounded-full ${statusResult.color}`}>{statusResult.text}</span>;
+};
 
 const BacklogList: React.FC = () => {
   const navigate = useNavigate();
@@ -45,32 +60,27 @@ const BacklogList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  // --- STATE FILTER BARU ---
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
-  const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>("open"); // Default ke 'open'
+  const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>("open");
   const [partStatus, setPartStatus] = useState<(typeof PART_STATUS_OPTIONS)[number]>("all");
   const [needShutdown, setNeedShutdown] = useState<(typeof SHUTDOWN_OPTIONS)[number]>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-
   const [sortBy, setSortBy] = useState<SortBy>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20);
 
-  // --- DEBOUNCE UNTUK SEARCH ---
   useEffect(() => {
     const timer = setTimeout(() => setQDebounced(q.trim()), 300);
     return () => clearTimeout(timer);
   }, [q]);
   
-  // --- RESET PAGE SAAT FILTER BERUBAH ---
   useEffect(() => {
     setPage(1);
   }, [qDebounced, status, partStatus, needShutdown, dateFrom, dateTo, pageSize, sortBy, sortDir]);
 
-  // --- FETCH DATA BARU (REALTIME) ---
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -98,12 +108,11 @@ const BacklogList: React.FC = () => {
 
         query = query.order(sortBy, { ascending: sortDir === "asc" });
         
-        const { data, error, count: initialCount } = await query;
+        const { data, error } = await query;
         if (error) throw error;
 
         let finalData = (data as BacklogRow[]) || [];
         
-        // Filter 'partStatus' tetap di client-side karena kompleksitasnya
         if (partStatus !== 'all') {
           finalData = finalData.filter(b => {
             if (partStatus === 'complete') {
@@ -131,20 +140,23 @@ const BacklogList: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
   const onReset = () => {
-    setQ("");
-    setStatus("open");
-    setPartStatus("all");
-    setNeedShutdown("all");
-    setDateFrom("");
-    setDateTo("");
-    setSortBy("date");
-    setSortDir("desc");
-    setPageSize(20);
+    setQ(""); setStatus("open"); setPartStatus("all"); setNeedShutdown("all");
+    setDateFrom(""); setDateTo(""); setSortBy("date"); setSortDir("desc"); setPageSize(20);
   };
 
-  const downloadExcelFull = async () => { /* ... (Tidak ada perubahan) ... */ };
+  const downloadExcelFull = async () => { await exportBacklogsExcel(); };
 
-  const tableColumns = useMemo(() => [ /* ... (Tidak ada perubahan) ... */ ], []);
+  const tableColumns = useMemo(() => [
+    { key: 'date', header: 'Tanggal', render: (row: BacklogRow) => row.date ? new Date(row.date).toLocaleDateString() : "-" },
+    { key: 'registration_code', header: 'Kode', render: (row: BacklogRow) => row.registration_code || "-" },
+    { key: 'unit_code', header: 'Unit', render: (row: BacklogRow) => row.unit_code },
+    { key: 'problem', header: 'Problem', render: (row: BacklogRow) => <div className="line-clamp-2">{row.problem}</div> },
+    { key: 'priority', header: 'Prioritas', render: (row: BacklogRow) => <span className="font-medium">{row.priority || ''}</span> },
+    { key: 'created_by', header: 'Dibuat Oleh', render: (row: BacklogRow) => row.created_by?.name || "-" },
+    { key: 'progress_sm', header: 'Progress SM', render: (row: BacklogRow) => <SupplyStatusBadge backlog={row} /> },
+    { key: 'status', header: 'Status', render: (row: BacklogRow) => row.status || "-" },
+    { key: 'detail', header: 'Detail', render: (row: BacklogRow) => <Link to={`/Backlog/detail/${row.id}`} className="text-blue-600 hover:underline">Lihat</Link> },
+  ], []);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -155,14 +167,12 @@ const BacklogList: React.FC = () => {
         </button>
       </div>
       
-      {/* --- UI FILTER BARU --- */}
       <div className="bg-gray-50 p-4 rounded-lg border mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="md:col-span-4 lg:col-span-6">
             <label className="block text-sm font-medium mb-1">Search</label>
             <input placeholder="Cari kode, unit, atau problem..." className="w-full border rounded px-3 py-2" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
-          
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium mb-1">Status Backlog</label>
             <select className="w-full border rounded px-3 py-2 bg-white" value={status} onChange={(e) => setStatus(e.target.value as any)}>
@@ -189,7 +199,6 @@ const BacklogList: React.FC = () => {
             <label className="block text-sm font-medium mb-1">Sampai Tanggal</label>
             <input type="date" className="w-full border rounded px-3 py-2" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
-          
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium mb-1">Urutkan</label>
             <div className="flex gap-2">
