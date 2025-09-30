@@ -236,7 +236,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   const renderSearchSelect = (label: string, field: string, source: string, showCode = false) => {
     const options = (masters[source] || []).map((item: any) => ({
       value: item.id,
-      label: showCode && item.code ? item.code : item.name
+     // label: showCode && item.code ? item.code : item.name
+      label: showCode && item.code ? `${item.code} — ${item.name}` : item.name
     }));
 
     return (
