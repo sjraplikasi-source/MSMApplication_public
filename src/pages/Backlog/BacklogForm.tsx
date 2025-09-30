@@ -109,14 +109,21 @@ useEffect(() => {
     alert('Gagal menghasilkan kode registrasi unik. Silakan coba lagi.');
   };
 
-  useEffect(() => {
+useEffect(() => {
     const fetchEquipment = async () => {
-      const { data } = await supabase.from('equipment').select('id, code');
-      const options = (data || []).map((e: any) => ({ value: e.code, label: e.code }));
+      // 1. Ambil kolom "name" juga dari tabel equipment
+      const { data } = await supabase.from('equipment').select('id, code, name');
+      
+      const options = (data || []).map((e: any) => ({ 
+        value: e.code, 
+        // 2. Gabungkan code dan name untuk label yang lebih informatif
+        label: `${e.code} — ${e.name}` 
+      }));
+
       setEquipmentOptions(options);
     };
     fetchEquipment();
-  }, []);
+}, []);
 
   const resetForm = async () => {
     setSelectedEquipment(null);
