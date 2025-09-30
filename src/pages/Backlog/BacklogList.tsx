@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { exportBacklogsExcel } from "@/utils/exportBacklogsExcel";
-import BacklogTable from "@/components/BacklogTable"; // <-- 1. IMPORT KOMPONEN BARU
+import BacklogTable from '../../components/BacklogTable';
 
 // --- Tipe Data (tetap sama) ---
 type UUID = string;
