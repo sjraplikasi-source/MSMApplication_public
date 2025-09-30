@@ -1,11 +1,11 @@
-// src/pages/Backlog/SupplyList.tsx (HASIL REFACTOR)
+// src/pages/Backlog/SupplyList.tsx (LENGKAP & FINAL)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { exportSupplyListExcel } from "@/utils/exportSupplyListExcel";
-import BacklogTable from "../../components/BacklogTable"; // Import tabel universal
-import SupplyStatusBadge from "../../components/SupplyStatusBadge"; // Import badge universal
+import BacklogTable from "../../components/BacklogTable";
+import SupplyStatusBadge from "../../components/SupplyStatusBadge";
 
 // Tipe data
 type UUID = string;
@@ -50,11 +50,15 @@ const SupplyList: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20);
   
-  // Debounce dan reset page (logika tetap sama)
-  useEffect(() => { /* ... (debounce) ... */ }, [q]);
-  useEffect(() => { setPage(1); }, [qDebounced, dateFrom, dateTo, smFilter, statusFilter, sortBy, sortDir, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setQDebounced(q.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [q]);
 
-  // Fetch data
+  useEffect(() => {
+    setPage(1);
+  }, [qDebounced, dateFrom, dateTo, smFilter, statusFilter, sortBy, sortDir, pageSize]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -72,7 +76,7 @@ const SupplyList: React.FC = () => {
           .eq("need_sparepart", true);
 
         if (statusFilter === "validated_reviewed") {
-          query = query.in("status", ["validated", "reviewed"]); // Diperluas ke validated & reviewed
+          query = query.in("status", ["validated", "reviewed"]);
         }
         if (qDebounced) {
           query = query.or(`registration_code.ilike.%${qDebounced}%,unit_code.ilike.%${qDebounced}%,problem.ilike.%${qDebounced}%`);
@@ -100,8 +104,29 @@ const SupplyList: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
-  const onReset = () => { /* ... (fungsi reset tetap sama) ... */ };
-  const handleDownloadExcel = async () => { /* ... (fungsi download tetap sama) ... */ };
+  const onReset = () => {
+    setQ("");
+    setDateFrom("");
+    setDateTo("");
+    setSmFilter("needs_update");
+    setStatusFilter("validated_reviewed");
+    setSortBy("date");
+    setSortDir("desc");
+    setPage(1);
+    setPageSize(20);
+  };
+
+  const handleDownloadExcel = async () => {
+    setDownloading(true);
+    try {
+      await exportSupplyListExcel({ q: qDebounced, dateFrom, dateTo, smFilter, statusFilter });
+    } catch (error) {
+      console.error("Gagal mendownload Excel:", error);
+      alert("Gagal mendownload file Excel. Lihat konsol untuk detail.");
+    } finally {
+      setDownloading(false);
+    }
+  };
   
   const tableColumns = useMemo(() => [
     { key: 'date', header: 'Tanggal', render: (row: BacklogRow) => row.date ? new Date(row.date).toLocaleDateString() : "-" },
@@ -121,7 +146,6 @@ const SupplyList: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Bar */}
       <div className="bg-gray-50 p-4 rounded-lg border mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="md:col-span-4 lg:col-span-6">
@@ -150,6 +174,30 @@ const SupplyList: React.FC = () => {
             <div>
                 <label className="block text-sm font-medium mb-1">Sampai Tanggal</label>
                 <input type="date" className="w-full border rounded px-3 py-2" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </div>
+            <div className="lg:col-span-2">
+                <label className="block text-sm font-medium mb-1">Urutkan</label>
+                <div className="flex gap-2">
+                    <select className="w-full border rounded px-3 py-2 bg-white" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
+                        <option value="date">Tanggal</option>
+                        <option value="registration_code">Kode</option>
+                        <option value="unit_code">Unit</option>
+                        <option value="status">Status</option>
+                    </select>
+                    <select className="w-full border rounded px-3 py-2 bg-white" value={sortDir} onChange={e => setSortDir(e.target.value as any)}>
+                        <option value="desc">Turun</option>
+                        <option value="asc">Naik</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1">Per Halaman</label>
+                <select className="w-full border rounded px-3 py-2 bg-white" value={pageSize} onChange={e => setPageSize(Number(e.target.value) as any)}>
+                    {PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}
+                </select>
+            </div>
+            <div className="flex items-end">
+                <button onClick={onReset} className="w-full border rounded px-3 py-2 hover:bg-gray-100 bg-white">Reset</button>
             </div>
         </div>
       </div>
