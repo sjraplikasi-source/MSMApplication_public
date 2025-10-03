@@ -34,6 +34,7 @@ type Spare = {
   remarks: string | null;
   no_wr_pr: string | null;
   no_po: string | null;
+  image_url?: string | null;
 };
 type Tool = {
   id?: UUID;
@@ -153,6 +154,7 @@ const BacklogReviewDetail: React.FC = () => {
             remarks: x.remarks ?? "",
             no_wr_pr: x.no_wr_pr ?? "",
             no_po: x.no_po ?? "",
+            image_url: x.image_url ?? null,
           })) ?? [];
         setSpares(spMapped);
         setInitSpareIds(spMapped.map((x) => x.id!).filter(Boolean) as UUID[]);
@@ -603,6 +605,19 @@ const BacklogReviewDetail: React.FC = () => {
                       onChange={(e) => updateRow(spares, setSpares, i, "remarks", e.target.value)}
                     />
                   </div>
+
+                  {/* --- Blok Tampilan Gambar Baru --- */}
+<div className="md:col-span-12 mt-2">
+  <label className="block text-sm mb-1">Gambar Part</label>
+  {s.image_url ? (
+    <a href={s.image_url} target="_blank" rel="noopener noreferrer">
+      <img src={s.image_url} alt="Foto Part" className="h-20 w-20 object-cover rounded border" />
+    </a>
+  ) : (
+    <p className="text-sm text-gray-500">- Tidak ada gambar -</p>
+  )}
+</div>
+                  
                 </div>
               </SectionCard>
             );
