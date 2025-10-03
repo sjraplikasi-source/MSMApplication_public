@@ -4,6 +4,7 @@
 import React, { useState, useEffect, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import Select from "react-select";
 
 type UUID = string;
 const cid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -169,6 +170,10 @@ const EditBacklog: React.FC = () => {
   // STATE UNTUK PRIORITAS HARUS DI SINI
   const [selectedPriority, setSelectedPriority] = useState<{ value: string, label: string } | null>(null);
 
+  // <-- BARU: State untuk dropdown equipment -->
+  const [equipmentOptions, setEquipmentOptions] = useState<{value: string, label: string}[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<{value: string, label: string} | null>(null);
+
   // ===== Lists =====
   const [sparepartList, setSparepartList] = useState<SparePartRow[]>([]);
   const [toolsList, setToolsList] = useState<ToolRow[]>([]);
@@ -267,6 +272,29 @@ const EditBacklog: React.FC = () => {
     return ok;
   };
 
+  // useEffect baru untuk mengambil data equipment
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      const { data, error } = await supabase.from('equipment').select('id, code, name');
+      if (data) {
+        const options = data.map((e: any) => ({ 
+          value: e.code, 
+          label: `${e.code} — ${e.name}` 
+        }));
+        setEquipmentOptions(options);
+      }
+    };
+    fetchEquipment();
+  }, []);
+
+  // useEffect untuk mensinkronkan unit_code dengan selectedEquipment
+  useEffect(() => {
+    if (unitCode && equipmentOptions.length > 0) {
+      const currentEquipment = equipmentOptions.find(opt => opt.value === unitCode);
+      setSelectedEquipment(currentEquipment || null);
+    }
+  }, [unitCode, equipmentOptions]);
+  
   // ===== Load all (sesuai skema) =====
   useEffect(() => {
     const load = async () => {
@@ -800,7 +828,7 @@ const EditBacklog: React.FC = () => {
       const { error: e1 } = await supabase
         .from("backlogs")
         .update({
-          unit_code: unitCode,
+          unit_code: selectedEquipment?.value || unitCode,
           date,
           problem,
           need_sparepart: needSparepart,
@@ -922,14 +950,15 @@ const EditBacklog: React.FC = () => {
       {/* Header */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div className="md:col-span-3">
-          <label className="block text-sm font-medium mb-1">Unit Code</label>
-          <input
-            className="w-full border rounded px-3 py-2"
-            value={unitCode}
-            onChange={(e) => setUnitCode(e.target.value)}
-            placeholder="e.g., 120-CV-02"
-          />
-        </div>
+        <label className="block text-sm font-medium mb-1">Unit Code</label>
+        <Select
+          options={equipmentOptions}
+          value={selectedEquipment}
+          onChange={(selected) => setSelectedEquipment(selected)}
+          placeholder="Pilih atau cari unit..."
+          isSearchable
+        />
+      </div>
         <div className="md:col-span-3">
           <label className="block text-sm font-medium mb-1">Tanggal</label>
           <input type="date" className="w-full border rounded px-3 py-2" value={date} onChange={(e) => setDate(e.target.value)} />
