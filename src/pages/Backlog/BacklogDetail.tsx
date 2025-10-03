@@ -35,6 +35,7 @@ type Spare = {
   remarks: string | null;
   no_wr_pr: string | null;
   no_po: string | null;
+  image_url?: string | null; 
 };
 
 type Tool = {
@@ -328,6 +329,7 @@ await pushNotif({
                     <th className="text-left p-2">Est. Ready</th>
                     <th className="text-left p-2">WR/PR</th>
                     <th className="text-left p-2">PO</th>
+                    <th className="text-left p-2">Gambar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,6 +346,15 @@ await pushNotif({
                       </td>
                       <td className="p-2">{s.no_wr_pr ?? "-"}</td>
                       <td className="p-2">{s.no_po ?? "-"}</td>
+                      <td className="p-2">
+  {s.image_url ? (
+    <a href={s.image_url} target="_blank" rel="noopener noreferrer">
+      <img src={s.image_url} alt="Part" className="h-12 w-12 object-cover rounded border hover:opacity-80" />
+    </a>
+  ) : (
+    "-"
+  )}
+</td>
                     </tr>
                   ))}
                 </tbody>
