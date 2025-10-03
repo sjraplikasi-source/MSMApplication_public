@@ -23,6 +23,7 @@ type SpareRow = {
   stock_status?: string | null;
   estimated_ready_date?: string | null;
   created_at?: string;
+  image_url?: string | null;
 };
 
 type Backlog = {
@@ -210,6 +211,7 @@ export default function SupplyDetail() {
                 <th>Remarks</th>
                 <th>Stock Status</th>
                 <th>Est. Ready</th>
+                <th>Gambar</th>
               </tr>
             </thead>
             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1">
@@ -231,6 +233,20 @@ export default function SupplyDetail() {
                       </select>
                     </td>
                     <td className="min-w-[160px]"><input type="date" className={`input input-sm w-full border rounded px-2 py-1 ${ready ? "bg-slate-100 cursor-not-allowed" : ""}`} value={s.estimated_ready_date ?? ""} onChange={(e) => handleSpareChange(i, { estimated_ready_date: e.target.value || null })} disabled={ready} placeholder="yyyy-mm-dd"/></td>
+
+                    <td className="min-w-[80px]">
+  {s.image_url ? (
+    <a href={s.image_url} target="_blank" rel="noopener noreferrer">
+      <img 
+        src={s.image_url} 
+        alt="Part" 
+        className="h-12 w-12 object-cover rounded border hover:opacity-80 cursor-pointer" 
+      />
+    </a>
+  ) : (
+    <span className="text-slate-400">-</span>
+  )}
+</td>
                   </tr>
                 );
               })}
