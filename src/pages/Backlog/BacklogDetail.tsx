@@ -237,7 +237,8 @@ await pushNotif({
   target_role: "planner",
 });
       
-      navigate(-1);
+     // navigate(-1);
+      window.location.href = '/Backlog/list'; 
     } catch (e: any) {
       console.error(e);
       alert("Gagal menutup backlog: " + (e?.message || e));
