@@ -16,7 +16,16 @@ const STATUS = {
   REJECTED: 'rejected',
 } as const;
 
-type SpareRow = { part_number: string; part_name: string; qty: number; remarks: string };
+//type SpareRow = { part_number: string; part_name: string; qty: number; remarks: string };
+type SpareRow = {
+  _cid: string; // Client-side ID untuk tracking
+  part_number: string;
+  part_name: string;
+  qty: number;
+  remarks: string;
+  image_url?: string | null;
+  uploading?: boolean;
+};
 type ToolRow = { tool_name: string; specification: string; qty: number; remarks: string };
 type ManRow = { skill_required: string; qty: number; remarks: string };
 
@@ -34,7 +43,9 @@ export default function BacklogForm() {
   const [needShutdown, setNeedShutdown] = useState(false);
   const [shutdownRequired, setShutdownRequired] = useState('');
 
-  const [spareparts, setSpareparts] = useState<SpareRow[]>([{ part_number: '', part_name: '', qty: 1, remarks: '' }]);
+  //const [spareparts, setSpareparts] = useState<SpareRow[]>([{ part_number: '', part_name: '', qty: 1, remarks: '' }]);
+  const cid = () => `${Date.now()}-${Math.random()}`; // Helper untuk ID unik
+const [spareparts, setSpareparts] = useState<SpareRow[]>([{ _cid: cid(), part_number: '', part_name: '', qty: 1, remarks: '' }]);
   const [tools, setTools] = useState<ToolRow[]>([{ tool_name: '', specification: '', qty: 1, remarks: '' }]);
   const [manpower, setManpower] = useState<ManRow[]>([{ skill_required: '', qty: 1, remarks: '' }]);
 
@@ -141,6 +152,45 @@ useEffect(() => {
     await generateNewCode();
   };
 
+  const handleImageUpload = async (file: File, cid: string) => {
+  if (!file) return;
+
+  // 1. Set status uploading
+  setSpareparts(prev => prev.map(sp => 
+    sp._cid === cid ? { ...sp, uploading: true } : sp
+  ));
+
+  try {
+    // 2. Buat nama file unik
+    const filePath = `public/${Date.now()}-${file.name}`;
+
+    // 3. Upload ke Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('sparepart-images') // Pastikan nama bucket sudah benar
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // 4. Dapatkan URL publik dari file yang diupload
+    const { data } = supabase.storage
+      .from('sparepart-images')
+      .getPublicUrl(filePath);
+
+    // 5. Update state dengan URL gambar baru
+    setSpareparts(prev => prev.map(sp => 
+      sp._cid === cid ? { ...sp, image_url: data.publicUrl, uploading: false } : sp
+    ));
+
+  } catch (error) {
+    console.error("Gagal upload gambar:", error);
+    alert("Gagal mengupload gambar.");
+    // Reset status uploading jika gagal
+    setSpareparts(prev => prev.map(sp => 
+      sp._cid === cid ? { ...sp, uploading: false } : sp
+    ));
+  }
+};
+  
   const handleSubmit = async () => {
     if (!selectedEquipment?.value || !date || !problem.trim()) {
       alert('Unit, tanggal, dan problem wajib diisi.');
@@ -186,11 +236,18 @@ useEffect(() => {
 
     const backlogId = (backlog as any).id;
 
-    if (needSparepart) {
-      for (const item of spareparts) {
-        await supabase.from('backlog_spareparts').insert({ backlog_id: backlogId, ...item });
-      }
-    }
+if (needSparepart) {
+  // Filter item yang kosong agar tidak tersimpan
+  const filledSpareparts = spareparts.filter(
+    item => item.part_number.trim() || item.part_name.trim()
+  );
+
+  for (const item of filledSpareparts) {
+    // Hapus properti temporary sebelum insert
+    const { _cid, uploading, ...dbData } = item;
+    await supabase.from('backlog_spareparts').insert({ backlog_id: backlogId, ...dbData });
+  }
+}
     if (needTools) {
       for (const item of tools) {
         await supabase.from('backlog_tools').insert({ backlog_id: backlogId, ...item });
@@ -274,25 +331,52 @@ useEffect(() => {
           <Checkbox id="sparepart" checked={needSparepart} onCheckedChange={(v) => setNeedSparepart(!!v)} />
           <Label htmlFor="sparepart">Butuh Sparepart</Label>
         </div>
-        {needSparepart && (
-          <div className="space-y-2 ml-4">
-            {spareparts.map((item, index) => (
-              <div key={index} className="grid grid-cols-4 gap-2">
-                <Input placeholder="Part Number" value={item.part_number}
-                  onChange={(e) => { const u=[...spareparts]; u[index].part_number=e.target.value; setSpareparts(u); }}/>
-                <Input placeholder="Part Name" value={item.part_name}
-                  onChange={(e) => { const u=[...spareparts]; u[index].part_name=e.target.value; setSpareparts(u); }}/>
-                <Input placeholder="Qty" type="number" value={item.qty}
-                  onChange={(e) => { const u=[...spareparts]; u[index].qty=Number(e.target.value); setSpareparts(u); }}/>
-                <Input placeholder="Remarks" value={item.remarks}
-                  onChange={(e) => { const u=[...spareparts]; u[index].remarks=e.target.value; setSpareparts(u); }}/>
-              </div>
-            ))}
-            <Button type="button" onClick={() => setSpareparts([...spareparts, { part_number: '', part_name: '', qty: 1, remarks: '' }])}>
-              + Tambah Sparepart
-            </Button>
+{needSparepart && (
+  <div className="space-y-4 ml-4 p-4 border rounded-md bg-gray-50">
+    {spareparts.map((item, index) => (
+      <div key={item._cid} className="p-3 border rounded bg-white">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <Input placeholder="Part Number" value={item.part_number}
+            onChange={(e) => { const u=[...spareparts]; u[index].part_number=e.target.value; setSpareparts(u); }}/>
+          <Input placeholder="Part Name" value={item.part_name}
+            onChange={(e) => { const u=[...spareparts]; u[index].part_name=e.target.value; setSpareparts(u); }}/>
+          <Input placeholder="Qty" type="number" value={item.qty}
+            onChange={(e) => { const u=[...spareparts]; u[index].qty=Number(e.target.value); setSpareparts(u); }}/>
+          <Input placeholder="Remarks" value={item.remarks}
+            onChange={(e) => { const u=[...spareparts]; u[index].remarks=e.target.value; setSpareparts(u); }}/>
+        </div>
+        {/* --- Bagian Upload Gambar --- */}
+        <div className="mt-3 flex items-center gap-4">
+          <div>
+            <Label htmlFor={`file-upload-${item._cid}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+              {item.uploading ? 'Mengupload...' : (item.image_url ? 'Ganti Gambar' : 'Upload Gambar')}
+            </Label>
+            <Input 
+              id={`file-upload-${item._cid}`} 
+              type="file" 
+              className="hidden"
+              accept="image/*"
+              disabled={item.uploading}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleImageUpload(e.target.files[0], item._cid);
+                }
+              }}
+            />
           </div>
-        )}
+          {item.image_url && (
+            <a href={item.image_url} target="_blank" rel="noopener noreferrer">
+              <img src={item.image_url} alt="Preview" className="h-12 w-12 object-cover rounded border" />
+            </a>
+          )}
+        </div>
+      </div>
+    ))}
+    <Button type="button" variant="outline" onClick={() => setSpareparts([...spareparts, { _cid: cid(), part_number: '', part_name: '', qty: 1, remarks: '' }])}>
+      + Tambah Sparepart
+    </Button>
+  </div>
+)}
 
         {/* Tools */}
         <div className="flex items-center space-x-2">
