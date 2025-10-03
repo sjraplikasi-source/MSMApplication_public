@@ -396,6 +396,8 @@ const EditBacklog: React.FC = () => {
   }, [id]);
 
   // ===== Sparepart UI =====
+// GANTI SELURUH FUNGSI INI
+
 const renderSparepartList = (items: SparePartRow[]) => (
     <div className="mt-3 space-y-4">
         {items.length === 0 && <div className="text-sm text-gray-500">Belum ada item. Tambahkan item pertama di bawah.</div>}
@@ -408,23 +410,159 @@ const renderSparepartList = (items: SparePartRow[]) => (
                     title={`Sparepart: ${item.part_name || 'Item Baru'}`}
                     onRemove={() => {
                         setSparepartList((p) => p.filter((x) => x._cid !== item._cid));
-                        // Hapus juga error yang terkait
+                        setSpareErrors((p) => {
+                            const c = { ...p };
+                            delete c[item._cid];
+                            return c;
+                        });
                     }}
                 >
-                    {/* Baris Input Utama */}
+                    {/* --- SEMUA INPUT FIELD YANG HILANG DIKEMBALIKAN DI SINI --- */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        {/* ... (semua input untuk part_number, part_name, qty, dll tetap di sini, tidak perlu diubah) ... */}
+                        <div className="md:col-span-3">
+                            <label className="block text-sm mb-1">Part Number</label>
+                            <input
+                                className={`w-full border rounded px-3 py-2 ${err.part_number ? "ring-1 ring-red-500" : ""}`}
+                                value={item.part_number}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, part_number: e.target.value } : r)))
+                                }
+                                onBlur={() =>
+                                    setSpareErrors((pe) => ({
+                                        ...pe,
+                                        [item._cid]: validateSpareItem(sparepartList.find((x) => x._cid === item._cid)!),
+                                    }))
+                                }
+                                placeholder="part number"
+                            />
+                            <FieldError msg={err.part_number} />
+                        </div>
+                        <div className="md:col-span-5">
+                            <label className="block text-sm mb-1">Part Name</label>
+                            <input
+                                className={`w-full border rounded px-3 py-2 ${err.part_name ? "ring-1 ring-red-500" : ""}`}
+                                value={item.part_name}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, part_name: e.target.value } : r)))
+                                }
+                                onBlur={() =>
+                                    setSpareErrors((pe) => ({
+                                        ...pe,
+                                        [item._cid]: validateSpareItem(sparepartList.find((x) => x._cid === item._cid)!),
+                                    }))
+                                }
+                                placeholder="part name"
+                            />
+                            <FieldError msg={err.part_name} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm mb-1">Qty</label>
+                            <input
+                                type="number"
+                                className={`w-full border rounded px-3 py-2 ${err.qty ? "ring-1 ring-red-500" : ""}`}
+                                min={0}
+                                value={item.qty}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, qty: Number(e.target.value) } : r)))
+                                }
+                                onBlur={() =>
+                                    setSpareErrors((pe) => ({
+                                        ...pe,
+                                        [item._cid]: validateSpareItem(sparepartList.find((x) => x._cid === item._cid)!),
+                                    }))
+                                }
+                                placeholder="0"
+                            />
+                            <FieldError msg={err.qty} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm mb-1">Stock Status</label>
+                            <select
+                                className={`w-full border rounded px-3 py-2 bg-white ${err.stock_status ? "ring-1 ring-red-500" : ""}`}
+                                value={item.stock_status || ""}
+                                onChange={(e) =>
+                                    setSparepartList((prev) =>
+                                        prev.map((r) =>
+                                            r._cid === item._cid
+                                                ? { ...r, stock_status: e.target.value, estimated_ready_date: e.target.value === "READY" ? "" : r.estimated_ready_date }
+                                                : r
+                                        )
+                                    )
+                                }
+                                onBlur={() =>
+                                    setSpareErrors((pe) => ({
+                                        ...pe,
+                                        [item._cid]: validateSpareItem(sparepartList.find((x) => x._cid === item._cid)!),
+                                    }))
+                                }
+                            >
+                                <option value="">Pilih status</option>
+                                {STOCK_STATUS_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                            <FieldError msg={err.stock_status} />
+                        </div>
+                        <div className="md:col-span-3">
+                            <label className="block text-sm mb-1">No WR/PR</label>
+                            <input
+                                className="w-full border rounded px-3 py-2"
+                                value={item.no_wr_pr || ""}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, no_wr_pr: e.target.value } : r)))
+                                }
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                            <label className="block text-sm mb-1">No PO</label>
+                            <input
+                                className="w-full border rounded px-3 py-2"
+                                value={item.no_po || ""}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, no_po: e.target.value } : r)))
+                                }
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                            <label className="block text-sm mb-1">Estimated Ready</label>
+                            <input
+                                type="date"
+                                className={`w-full border rounded px-3 py-2 ${err.estimated_ready_date ? "ring-1 ring-red-500" : ""} ${isReady ? "opacity-60 cursor-not-allowed" : ""}`}
+                                value={item.estimated_ready_date || ""}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, estimated_ready_date: e.target.value } : r)))
+                                }
+                                onBlur={() =>
+                                    setSpareErrors((pe) => ({
+                                        ...pe,
+                                        [item._cid]: validateSpareItem(sparepartList.find((x) => x._cid === item._cid)!),
+                                    }))
+                                }
+                                disabled={isReady}
+                            />
+                            <FieldError msg={err.estimated_ready_date} />
+                        </div>
+                        <div className="md:col-span-3">
+                            <label className="block text-sm mb-1">Remarks</label>
+                            <input
+                                className="w-full border rounded px-3 py-2"
+                                value={item.remarks || ""}
+                                onChange={(e) =>
+                                    setSparepartList((prev) => prev.map((r) => (r._cid === item._cid ? { ...r, remarks: e.target.value } : r)))
+                                }
+                            />
+                        </div>
                     </div>
 
-                    {/* --- BAGIAN UPLOAD GAMBAR BARU --- */}
+                    {/* Bagian Upload Gambar */}
                     <div className="mt-4 pt-3 border-t flex items-center gap-4">
                         <div>
                             <label htmlFor={`file-upload-${item._cid}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
                                 {item.uploading ? 'Mengupload...' : (item.image_url ? 'Ganti Gambar' : 'Upload Gambar')}
                             </label>
-                            <input 
-                                id={`file-upload-${item._cid}`} 
-                                type="file" 
+                            <input
+                                id={`file-upload-${item._cid}`}
+                                type="file"
                                 className="hidden"
                                 accept="image/*"
                                 disabled={item.uploading}
@@ -441,7 +579,6 @@ const renderSparepartList = (items: SparePartRow[]) => (
                             </a>
                         )}
                     </div>
-                    {/* --- AKHIR BAGIAN UPLOAD --- */}
                 </SectionCard>
             );
         })}
@@ -454,98 +591,6 @@ const renderSparepartList = (items: SparePartRow[]) => (
         </button>
     </div>
 );
-
-  // ===== Tools UI =====
-  const renderTools = (items: ToolRow[]) => (
-    <div className="mt-3 space-y-4">
-      {items.length === 0 && <div className="text-sm text-gray-500">Belum ada tool.</div>}
-      {items.map((it) => {
-        const err = toolErrors[it._cid] || {};
-        return (
-          <SectionCard
-            key={it._cid}
-            title="Tool"
-            onRemove={() => {
-              setToolsList((p) => p.filter((x) => x._cid !== it._cid));
-              setToolErrors((p) => {
-                const c = { ...p };
-                delete c[it._cid];
-                return c;
-              });
-            }}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div className="md:col-span-5">
-                <label className="block text-sm mb-1">Tool</label>
-                <input
-                  className={`w-full border rounded px-3 py-2 ${err.tool_name ? "ring-1 ring-red-500" : ""}`}
-                  value={it.tool_name}
-                  onChange={(e) =>
-                    setToolsList((prev) => prev.map((r) => (r._cid === it._cid ? { ...r, tool_name: e.target.value } : r)))
-                  }
-                  onBlur={() =>
-                    setToolErrors((pe) => ({
-                      ...pe,
-                      [it._cid]: validateToolItem(toolsList.find((x) => x._cid === it._cid)!),
-                    }))
-                  }
-                  placeholder="nama tool / peralatan"
-                />
-                <FieldError msg={err.tool_name} />
-              </div>
-              <div className="md:col-span-3">
-                <label className="block text-sm mb-1">Specification</label>
-                <input
-                  className="w-full border rounded px-3 py-2"
-                  value={it.specification ?? ""}
-                  onChange={(e) =>
-                    setToolsList((prev) => prev.map((r) => (r._cid === it._cid ? { ...r, specification: e.target.value } : r)))
-                  }
-                  placeholder="opsional"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm mb-1">Qty</label>
-                <input
-                  type="number"
-                  className={`w-full border rounded px-3 py-2 ${err.qty ? "ring-1 ring-red-500" : ""}`}
-                  min={0}
-                  value={it.qty}
-                  onChange={(e) =>
-                    setToolsList((prev) => prev.map((r) => (r._cid === it._cid ? { ...r, qty: Number(e.target.value) } : r)))
-                  }
-                  onBlur={() =>
-                    setToolErrors((pe) => ({
-                      ...pe,
-                      [it._cid]: validateToolItem(toolsList.find((x) => x._cid === it._cid)!),
-                    }))
-                  }
-                />
-                <FieldError msg={err.qty} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm mb-1">Remarks</label>
-                <input
-                  className="w-full border rounded px-3 py-2"
-                  value={it.remarks ?? ""}
-                  onChange={(e) =>
-                    setToolsList((prev) => prev.map((r) => (r._cid === it._cid ? { ...r, remarks: e.target.value } : r)))
-                  }
-                />
-              </div>
-            </div>
-          </SectionCard>
-        );
-      })}
-      <button
-        type="button"
-        onClick={() => setToolsList((p) => [...p, { _cid: cid(), tool_name: "", specification: null, qty: 1, remarks: null }])}
-        className="w-full border border-dashed rounded px-3 py-2 hover:bg-gray-50"
-      >
-        + Tambah Tool
-      </button>
-    </div>
-  );
 
   // ===== Manpower UI =====
   const renderManpower = (items: ManpowerRow[]) => (
