@@ -317,11 +317,7 @@ openBacklogs.forEach(b => {
           </div>
         </div>
         {/* --- AKHIR DARI BAGIAN YANG DIMODIFIKASI --- */}
-          
-            <div className="lg:col-span-2">
-                <ResourceTable data={resourceData} navigate={navigate} />
-            </div>
-          </div>
+
         </>
         )}
       </div>
