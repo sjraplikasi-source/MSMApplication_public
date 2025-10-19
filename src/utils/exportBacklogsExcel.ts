@@ -9,6 +9,7 @@ type BacklogRow = {
   problem: string | null;
   date: string | null;
   status: string | null;
+  priority: string | null;
   need_sparepart?: boolean | null;
   need_tools?: boolean | null;
   need_manpower?: boolean | null;
@@ -59,7 +60,7 @@ export async function exportBacklogsExcel(): Promise<void> {
   const { data: allBacklogs, error: eB } = await supabase
     .from("backlogs")
     .select(`
-      id, registration_code, unit_code, problem, date, status,
+      id, registration_code, unit_code, problem, date, status, priority,
       need_sparepart, need_tools, need_manpower, need_shutdown, shutdown_required,
       validated_at,
       validated_by_user:users!backlogs_validated_by_fkey(name)
@@ -87,6 +88,7 @@ export async function exportBacklogsExcel(): Promise<void> {
       b.unit_code ?? "",
       b.problem ?? "",
       b.status ?? "",
+      b.priority ?? "Improve",
       b.need_sparepart ? "Ya" : "Tidak",
       b.need_tools ? "Ya" : "Tidak",
       b.need_manpower ? "Ya" : "Tidak",
@@ -105,6 +107,7 @@ export async function exportBacklogsExcel(): Promise<void> {
       "Unit",
       "Problem",
       "Status",
+      "Prioritas",
       "Butuh Sparepart",
       "Butuh Tools",
       "Butuh Manpower",
