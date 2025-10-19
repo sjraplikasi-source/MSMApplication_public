@@ -266,12 +266,28 @@ openBacklogs.forEach(b => {
               <ResponsiveContainer><BarChart data={equipmentData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" fontSize={12} /><YAxis type="category" dataKey="name" width={80} fontSize={12} interval={0} /><Tooltip /><Bar dataKey="value" name="Jumlah Backlog" fill="#3b82f6" /></BarChart></ResponsiveContainer>
             </ChartContainer>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <ChartContainer title="Status Kesiapan Part" isLoading={loading}>
-                <ResponsiveContainer><PieChart><Pie data={partStatusData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>{partStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
-            </ChartContainer>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartContainer title="Status Kesiapan Part" isLoading={loading}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie 
+                  data={partStatusData} 
+                  cx="50%" 
+                  cy="50%" 
+                  labelLine={false} 
+                  outerRadius={80} 
+                  fill="#8884d8" 
+                  dataKey="value" 
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                >
+                  {partStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartContainer>
 
-            {/* --- GRAFIK BARU DITAMBAHKAN DI SINI --- */}
           <ChartContainer title="Status Prioritas Backlog" isLoading={loading}>
             <ResponsiveContainer>
               <PieChart>
@@ -280,7 +296,7 @@ openBacklogs.forEach(b => {
                   cx="50%" 
                   cy="50%" 
                   labelLine={false}
-                  innerRadius={60} // Ini yang membuatnya jadi Donut Chart
+                  innerRadius={60}
                   outerRadius={80} 
                   fill="#8884d8" 
                   dataKey="value"
@@ -296,7 +312,7 @@ openBacklogs.forEach(b => {
             </ResponsiveContainer>
           </ChartContainer>
 
-          <div className="lg:col-span-2"> {/* Tabel Analisis sekarang berada di bawah dan mengambil 2 kolom */}
+          <div className="lg:col-span-2">
             <ResourceTable data={resourceData} navigate={navigate} />
           </div>
         </div>
