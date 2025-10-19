@@ -25,13 +25,14 @@ type BacklogRow = {
   need_shutdown: boolean;
   priority: 'High' | 'Medium' | 'Low' | 'Improve' | null;
 };
-type SortBy = "date" | "unit_code" | "registration_code" | "problem" | "status";
+type SortBy = "date" | "unit_code" | "registration_code" | "problem" | "status" | "priority";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const STATUS_OPTIONS = ["all", "open", "draft", "validated", "reviewed", "closed", "rejected"] as const;
 const PART_STATUS_OPTIONS = ["all", "complete", "waiting"] as const;
 const SHUTDOWN_OPTIONS = ["all", "true", "false"] as const;
+const PRIORITY_OPTIONS = ["all", "High", "Medium", "Low", "Improve"] as const;
 
 // --- Komponen Status ---
 const SupplyStatusBadge: React.FC<{ backlog: BacklogRow }> = ({ backlog }) => {
@@ -65,6 +66,7 @@ const BacklogList: React.FC = () => {
   const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>("open");
   const [partStatus, setPartStatus] = useState<(typeof PART_STATUS_OPTIONS)[number]>("all");
   const [needShutdown, setNeedShutdown] = useState<(typeof SHUTDOWN_OPTIONS)[number]>("all");
+  const [priorityFilter, setPriorityFilter] = useState<(typeof PRIORITY_OPTIONS)[number]>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortBy>("date");
@@ -79,7 +81,7 @@ const BacklogList: React.FC = () => {
   
   useEffect(() => {
     setPage(1);
-  }, [qDebounced, status, partStatus, needShutdown, dateFrom, dateTo, pageSize, sortBy, sortDir]);
+  }, [qDebounced, status, partStatus, needShutdown, priorityFilter, dateFrom, dateTo, pageSize, sortBy, sortDir]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,6 +105,7 @@ const BacklogList: React.FC = () => {
         }
         if (needShutdown === 'true') { query = query.is('need_shutdown', true); }
         if (needShutdown === 'false') { query = query.is('need_shutdown', false); }
+        if (priorityFilter !== "all") { query = query.eq("priority", priorityFilter); }
         if (dateFrom) { query = query.gte("date", dateFrom); }
         if (dateTo) { query = query.lte("date", dateTo); }
 
@@ -135,7 +138,7 @@ const BacklogList: React.FC = () => {
       }
     };
     fetchData();
-  }, [qDebounced, status, partStatus, needShutdown, dateFrom, dateTo, page, pageSize, sortBy, sortDir]);
+  }, [qDebounced, status, partStatus, needShutdown, priorityFilter, dateFrom, dateTo, page, pageSize, sortBy, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
@@ -168,7 +171,7 @@ const BacklogList: React.FC = () => {
       </div>
       
       <div className="bg-gray-50 p-4 rounded-lg border mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="md:col-span-4 lg:col-span-6">
             <label className="block text-sm font-medium mb-1">Search</label>
             <input placeholder="Cari kode, unit, atau problem..." className="w-full border rounded px-3 py-2" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -204,6 +207,7 @@ const BacklogList: React.FC = () => {
             <div className="flex gap-2">
               <select className="w-full border rounded px-3 py-2 bg-white" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
                 <option value="date">Tanggal</option>
+                <option value="priority">Prioritas</option>
                 <option value="registration_code">Kode</option>
                 <option value="unit_code">Unit</option>
                 <option value="status">Status</option>
