@@ -23,6 +23,7 @@ type MonthlyData = { month: string; created: number; closed: number };
 type EquipmentData = { name: string; value: number };
 type PartStatusData = { name: string; value: number };
 type ResourceData = { name: string; value: number; filterKey: string; filterValue: string };
+type PriorityData = { name: string; value: number };
 
 // --- Komponen UI ---
 const KpiCard = ({ title, value, description, icon: Icon, color, onClick }) => (
@@ -66,6 +67,7 @@ const ResourceTable = ({ data, navigate }) => (
     </div>
 );
 const COLORS = ['#FF8042', '#0088FE', '#00C49F'];
+const PRIORITY_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#6B7280'];
 
 // --- Komponen Utama Dashboard ---
 export default function App() {
@@ -79,6 +81,7 @@ export default function App() {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [equipmentData, setEquipmentData] = useState<EquipmentData[]>([]);
   const [partStatusData, setPartStatusData] = useState<PartStatusData[]>([]);
+  const [priorityData, setPriorityData] = useState<PriorityData[]>([]);
   const [resourceData, setResourceData] = useState<ResourceData[]>([]);
 
   useEffect(() => {
@@ -102,6 +105,23 @@ export default function App() {
       if (error) { console.error("Error fetching data:", error); setLoading(false); return; }
 
       const openBacklogs = data.filter(b => b.status !== 'closed' && b.status !== 'rejected');
+
+      // --- LOGIKA BARU UNTUK MENGHITUNG PRIORITAS ---
+      const priorityCounts = openBacklogs.reduce((acc, backlog) => {
+        const priority = backlog.priority || 'Improve'; // Jika prioritas null, anggap 'Improve'
+        acc[priority] = (acc[priority] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const formattedPriorityData: PriorityData[] = [
+        { name: 'High', value: priorityCounts.High || 0 },
+        { name: 'Medium', value: priorityCounts.Medium || 0 },
+        { name: 'Low', value: priorityCounts.Low || 0 },
+        { name: 'Improve', value: priorityCounts.Improve || 0 },
+      ].filter(p => p.value > 0); // Hanya tampilkan prioritas yang ada backlognya
+
+      setPriorityData(formattedPriorityData);
+      // --- AKHIR LOGIKA BARU ---
       
       const waitingValidation = openBacklogs.filter(b => b.status === 'draft').length;
       const waitingReview = openBacklogs.filter(b => b.status === 'validated').length;
@@ -250,6 +270,38 @@ openBacklogs.forEach(b => {
             <ChartContainer title="Status Kesiapan Part" isLoading={loading}>
                 <ResponsiveContainer><PieChart><Pie data={partStatusData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>{partStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
             </ChartContainer>
+
+            {/* --- GRAFIK BARU DITAMBAHKAN DI SINI --- */}
+          <ChartContainer title="Status Prioritas Backlog" isLoading={loading}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie 
+                  data={priorityData} 
+                  cx="50%" 
+                  cy="50%" 
+                  labelLine={false}
+                  innerRadius={60} // Ini yang membuatnya jadi Donut Chart
+                  outerRadius={80} 
+                  fill="#8884d8" 
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
+                  {priorityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[index % PRIORITY_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+
+          <div className="lg:col-span-2"> {/* Tabel Analisis sekarang berada di bawah dan mengambil 2 kolom */}
+            <ResourceTable data={resourceData} navigate={navigate} />
+          </div>
+        </div>
+        {/* --- AKHIR DARI BAGIAN YANG DIMODIFIKASI --- */}
+          
             <div className="lg:col-span-2">
                 <ResourceTable data={resourceData} navigate={navigate} />
             </div>
