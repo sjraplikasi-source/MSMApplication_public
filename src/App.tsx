@@ -123,18 +123,21 @@ function AppRoutes() {
         <Route path="/operational/energy-monitoring" element={<ProtectedRoute><Layout><EnergyMonitoring /></Layout></ProtectedRoute>} />
 
         {/* ✅ Mine Maintenance Module */}
-       <Route
-    path="/mine-maintenance/*"
-    element={
-      <ProtectedRoute>
-        <Layout>
-          <MineRouter />
-        </Layout>
-      </ProtectedRoute>
-    }
-  />
-</Suspense>
+        <Route
+          path="/mine-maintenance/*"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <MineRouter />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Suspense>
+  );
 }
+
 
 // ======================================================
 // Main App
