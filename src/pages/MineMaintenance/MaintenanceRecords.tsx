@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, Search, Filter, Plus, Calendar, Clock, PenTool as Tool } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import AddMaintenanceRecordModal from '../components/modals/AddMaintenanceRecordModal';
+import AddMaintenanceRecordModal from '@/components/mine/modals/AddMaintenanceRecordModal';
 
 interface MaintenanceExecution {
   id: string;
