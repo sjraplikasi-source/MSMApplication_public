@@ -1,6 +1,6 @@
 // src/hooks/useReportById.ts
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export const useReportById = (id: string) => {
   const [report, setReport] = useState<any>(null);
