@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';Client';
+import { supabase } from '@/lib/supabaseClient';
 import { generateNextWeeklyCheck } from '../../services/weeklyCheckScheduler';
 
 interface Props {
