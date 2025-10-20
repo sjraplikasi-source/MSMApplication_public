@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, AlertTriangle, CheckCircle, MoreHorizontal, LayoutGrid, LayoutList, Clock, Filter } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 import AddEquipmentModal from '../components/modals/AddEquipmentModal';
 
 const Equipment: React.FC = () => {
