@@ -184,6 +184,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   ];
 
+  // Tambahkan menu Mine Maintenance
+const NAV_MINE: NavItem[] = [
+  { path: "/mine-maintenance/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/mine-maintenance/equipment", label: "Equipment", icon: Wrench },
+  { path: "/mine-maintenance/components", label: "Components", icon: ClipboardList },
+  { path: "/mine-maintenance/hour-meter", label: "Hour Meter", icon: Calendar },
+  { path: "/mine-maintenance/weekly-check", label: "Weekly Check", icon: CheckCircle },
+  { path: "/mine-maintenance/schedule", label: "Maintenance Schedule", icon: Calendar },
+  { path: "/mine-maintenance/records", label: "Maintenance Records", icon: FileText },
+  { path: "/mine-maintenance/planning", label: "Planning", icon: ListChecks },
+  { path: "/mine-maintenance/settings", label: "Maintenance Settings", icon: Settings },
+];
+
   const NAV_SUPPLY: NavItem[] = [
 
     { path: "/supply/backlog", label: "SM — Backlog", icon: ClipboardList, prefix: "/supply/backlog" },
@@ -220,6 +233,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (!isSupplyOnly) menus.push({ id: 'daily', title: 'R&M Activity', items: NAV_DAILY.filter(item => canSee(item.path)) });
 
     if (!isSupplyOnly) menus.push({ id: 'backlog', title: 'Backlog', items: NAV_BACKLOG.filter(item => canSee(item.path)) });
+
+    if (!isSupplyOnly) menus.push({ id: 'mine', title: 'Mine Maintenance', items: NAV_MINE.filter(item => canSee(item.path)) });
 
     if (isSupplyOnly || isAdmin) menus.push({ id: 'SM', title: 'Supply Management', items: NAV_SUPPLY.filter(item => canSee(item.path)) });
 
