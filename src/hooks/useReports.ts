@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Report } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export const useReports = () => {
   const [reports, setReports] = useState<Report[]>([]);
