@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, PenTool } from 'lucide-react';
-import { useMaintenanceContext } from '../../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 
 interface PerformMaintenanceModalProps {
   isOpen: boolean;
