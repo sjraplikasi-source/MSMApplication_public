@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Tabs, Tab } from "../components/ui/tabs";
 import { Card, CardContent } from "../components/ui/card";
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface BreakdownData {
   label: string;
