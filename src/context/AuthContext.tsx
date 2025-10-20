@@ -3,7 +3,8 @@
 // =============================
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
+
 
 interface UserType {
   id: string;
