@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, AlertTriangle, CheckCircle, PenTool, MoreHorizontal } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 import PerformMaintenanceModal from './modals/PerformMaintenanceModal';
 
 interface ComponentCardProps {
