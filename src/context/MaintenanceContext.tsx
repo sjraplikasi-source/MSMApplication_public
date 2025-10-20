@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 // Types
 interface Equipment {
