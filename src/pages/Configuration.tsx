@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const tables = [
   'action', 'activities', 'activity_type', 'area', 'diagnosis', 'equipment',
