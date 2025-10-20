@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, CheckCircle, Calendar } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from "../../context/MaintenanceContext";
 import MaintenanceStatusCard from '../components/MaintenanceStatusCard';
 import UpcomingMaintenanceTable from '../components/UpcomingMaintenanceTable';
 
