@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Filter, Download, Wrench, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-import { supabase } from '../../lib/supabase'; // <-- FIX: Changed to relative path
+import { supabase } from '@/lib/supabase'; // <-- FIX: Changed to relative path
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
