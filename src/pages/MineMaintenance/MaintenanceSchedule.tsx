@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarClock, Search, Filter, Plus, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import AddMaintenanceScheduleModal from '../components/modals/AddMaintenanceScheduleModal';
-import AddMaintenanceRecordModal from '../components/modals/AddMaintenanceRecordModal';
+import AddMaintenanceScheduleModal from '@/components/mine/modals/AddMaintenanceScheduleModal';
+import AddMaintenanceRecordModal from '@/components/mine/modals/AddMaintenanceRecordModal';
 
 interface MaintenanceSchedule {
   id: string;
