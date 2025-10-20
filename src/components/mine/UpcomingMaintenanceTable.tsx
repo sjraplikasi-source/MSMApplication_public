@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wrench, Clock } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 
 interface UpcomingMaintenanceTableProps {
   maintenanceItems: any[];
