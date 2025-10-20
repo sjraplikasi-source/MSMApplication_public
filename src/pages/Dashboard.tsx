@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Filter, Wrench, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // <-- FIX: Changed to relative path
+import { supabase } from '@/lib/supabase'; // <-- FIX: Changed to relative path
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
