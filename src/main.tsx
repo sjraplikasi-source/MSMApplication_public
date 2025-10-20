@@ -1,20 +1,22 @@
 // =============================
-// src/main.tsx
+// src/main.tsx (fixed version)
 // =============================
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { AuthProvider } from './context/AuthContext'; // ✅ import AuthProvider
+import { AuthProvider } from './context/AuthContext';
+import { MaintenanceProvider } from './context/MaintenanceContext'; // ✅ pastikan sudah diimport
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
+
 root.render(
   <React.StrictMode>
-    <AuthProvider> {/* ✅ bungkus App di sini */}
+    <AuthProvider>
       <MaintenanceProvider>
         <App />
-      <MaintenanceProvider>
+      </MaintenanceProvider>
     </AuthProvider>
   </React.StrictMode>
 );
