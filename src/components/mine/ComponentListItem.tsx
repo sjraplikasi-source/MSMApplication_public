@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, PenTool } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 
 interface ComponentListItemProps {
   component: any;
