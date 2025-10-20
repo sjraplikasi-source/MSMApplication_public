@@ -1,7 +1,7 @@
 // src/hooks/useReportData.ts
 import { useState, useEffect, useCallback } from 'react';
 import { Report } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export const useReportData = (filters?: Partial<Report>) => {
   const [reports, setReports] = useState<Report[]>([]);
