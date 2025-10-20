@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '../components/ui/button';
+import { HardHat } from 'lucide-react';
 
 // Tipe data untuk summary
 interface SummaryData {
@@ -181,7 +182,29 @@ const HomePage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 4. Administrator Card */}
+              {/* 4. Mine Maintenance Card */}
+<div 
+    onClick={() => handleNavigate('/mine-maintenance')}
+    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+>
+    <div className="flex justify-between items-start">
+        <div className="bg-blue-100 p-3 rounded-lg">
+            <HardHat className="text-blue-600" size={28} />
+        </div>
+        <ArrowRight className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+    </div>
+    <div className="mt-4">
+        <h3 className="text-xl font-bold text-gray-800">Mine Maintenance</h3>
+        <p className="text-sm text-gray-500 mt-1">Equipment, Komponen & Hour Meter</p>
+    </div>
+    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+        <span className="text-gray-600">Status:</span>
+        <span className="font-bold text-blue-600">Online</span>
+    </div>
+</div>
+
+              
+                {/* 5. Administrator Card */}
                 <div 
                     onClick={() => handleNavigate('/konfigurasi')}
                     className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
