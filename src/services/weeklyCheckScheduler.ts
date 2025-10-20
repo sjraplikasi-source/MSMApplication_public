@@ -1,5 +1,5 @@
 // src/services/weeklyCheckScheduler.ts
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { addDays, format } from 'date-fns';
 
 export async function generateNextWeeklyCheck() {
