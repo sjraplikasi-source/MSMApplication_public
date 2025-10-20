@@ -12,7 +12,9 @@ const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(
   <React.StrictMode>
     <AuthProvider> {/* ✅ bungkus App di sini */}
-      <App />
+      <MaintenanceProvider>
+        <App />
+      <MaintenanceProvider>
     </AuthProvider>
   </React.StrictMode>
 );
