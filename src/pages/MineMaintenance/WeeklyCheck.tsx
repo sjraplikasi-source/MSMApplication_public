@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
 import WeeklyCheckForm from '../components/modals/WeeklyCheckForm';
 import EditActualDateModal from '../components/modals/EditActualDateModal';
