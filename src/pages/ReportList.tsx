@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Button } from '../components/ui/button';
 import { Plus } from 'lucide-react';
 import { DataTable } from '../components/ui/data-table';
