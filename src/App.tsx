@@ -39,6 +39,7 @@ import EnergyInput from "./pages/Operational/EnergyInput";
 import EnergyMonitoring from "./pages/Operational/EnergyMonitoring";
 
 import { useAuth } from "./context/AuthContext";
+import { Toaster } from 'react-hot-toast';
 
 // Lazy load modul MineMaintenance
 const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
