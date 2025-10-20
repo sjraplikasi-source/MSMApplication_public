@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Settings } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 import ComponentListItem from '../components/ComponentListItem';
 
 const Components: React.FC = () => {
