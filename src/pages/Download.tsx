@@ -1,6 +1,6 @@
 // src/pages/Download.tsx
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
