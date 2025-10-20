@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Clock, Wrench, Edit, Plus } from 'lucide-react';
 import { useMaintenanceContext } from '@/context/MaintenanceContext';
-import AddComponentModal from '../components/modals/AddComponentModal';
+import AddComponentModal from "@/components/mine/modals/AddComponentModal";
 import ComponentCard from '../components/ComponentCard';
 import HourMeterUpdateModal from '../components/modals/HourMeterUpdateModal';
 import MaintenanceHistoryTable from '../components/MaintenanceHistoryTable';
