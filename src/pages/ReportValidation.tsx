@@ -3,7 +3,7 @@
 // =============================
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
