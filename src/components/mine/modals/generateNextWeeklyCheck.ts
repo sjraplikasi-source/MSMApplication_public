@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { addDays, format } from 'date-fns';
 
 export async function generateNextWeeklyCheck() {
