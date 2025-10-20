@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Clock, Settings, Calendar } from 'lucide-react';
-import { useMaintenanceContext } from '../../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 
 interface HourMeterUpdateModalProps {
   isOpen: boolean;
