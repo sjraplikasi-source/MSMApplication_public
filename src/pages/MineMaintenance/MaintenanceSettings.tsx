@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Settings, Save, Trash2 } from 'lucide-react';
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+import { useMaintenanceContext } from '@/context/MaintenanceContext';
 
 const MaintenanceSettings: React.FC = () => {
   const { 
