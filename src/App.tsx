@@ -36,6 +36,9 @@ import ShutdownPlanner from "./pages/Backlog/ShutdownPlanner";
 import EnergyInput from "./pages/Operational/EnergyInput";
 import EnergyMonitoring from "./pages/Operational/EnergyMonitoring";
 
+import React, { Suspense, lazy } from "react";
+const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly = false }) => {
   const { user, loading } = useAuth();
 
@@ -94,6 +97,10 @@ function AppRoutes() {
       <Route path="/operational/energy-input" element={<ProtectedRoute><Layout><EnergyInput /></Layout></ProtectedRoute>} />
 
       <Route path="/operational/energy-monitoring" element={<ProtectedRoute><Layout><EnergyMonitoring /></Layout></ProtectedRoute>} />
+
+      <Suspense fallback={<div>Loading Mine Maintenance...</div>}>
+  <Route path="/mine-maintenance/*" element={<MineRouter />} />
+</Suspense>
       
     </Routes>
   );
