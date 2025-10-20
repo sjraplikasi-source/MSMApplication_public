@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
-import WeeklyCheckForm from '../components/modals/WeeklyCheckForm';
-import EditActualDateModal from '../components/modals/EditActualDateModal';
+import WeeklyCheckForm from '@/components/mine/modals/WeeklyCheckForm';
+import EditActualDateModal from '@/components/mine/modals/EditActualDateModal';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
