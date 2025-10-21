@@ -3,12 +3,11 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Check, Undo2 } from "lucide-react";
+import { Plus, Undo2 } from "lucide-react";
 
 interface BorrowRecord {
   id: string;
   tool_id: string;
-  employee_id?: string;
   quantity: number;
   borrowed_at: string;
   expected_return_at?: string;
@@ -18,11 +17,11 @@ interface BorrowRecord {
   tool?: { name: string };
 }
 
-
 interface Tool {
-  id: number;
+  id: string;
   name: string;
-  stock: number;
+  quantity: number;
+  available_quantity: number;
 }
 
 export default function BorrowReturn() {
@@ -32,14 +31,11 @@ export default function BorrowReturn() {
   const [form, setForm] = useState({ tool_id: "", borrower_name: "", quantity: 1 });
 
   const fetchData = async () => {
-const { data: toolsData } = await supabase.from("tools").select("id, name, available_quantity, quantity");
-const { data: borrowData } = await supabase
-  .from("tool_loans")
-  .select("*, tool:tools(name)")
-  .order("borrowed_at", { ascending: false });
-
-
-
+    const { data: toolsData } = await supabase.from("tools").select("id, name, quantity, available_quantity");
+    const { data: borrowData } = await supabase
+      .from("tool_loans")
+      .select("*, tool:tools(name)")
+      .order("borrowed_at", { ascending: false });
     setTools(toolsData || []);
     setRecords(borrowData || []);
   };
@@ -50,25 +46,26 @@ const { data: borrowData } = await supabase
 
   const handleBorrow = async (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedTool = tools.find((t) => t.id === Number(form.tool_id));
+    const selectedTool = tools.find((t) => t.id === form.tool_id);
     if (!selectedTool) return alert("Tool tidak ditemukan!");
-    if (selectedTool.stock < Number(form.quantity)) return alert("Stok tidak cukup!");
+    if (selectedTool.available_quantity < form.quantity) return alert("Stok tidak cukup!");
 
-await supabase.from("tool_loans").insert([
-  {
-    tool_id: form.tool_id,
-    quantity: Number(form.quantity),
-    borrowed_at: new Date().toISOString(),
-    expected_return_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // contoh: 3 hari
-    status: "borrowed",
-    notes: form.borrower_name, // sementara catat nama peminjam di kolom notes
-  },
-]);
-
+    await supabase.from("tool_loans").insert([
+      {
+        tool_id: form.tool_id,
+        quantity: Number(form.quantity),
+        borrowed_at: new Date().toISOString(),
+        expected_return_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        status: "borrowed",
+        notes: form.borrower_name,
+      },
+    ]);
 
     await supabase
       .from("tools")
-      .update({ stock: selectedTool.stock - Number(form.quantity), status: "Borrowed" })
+      .update({
+        available_quantity: selectedTool.available_quantity - Number(form.quantity),
+      })
       .eq("id", selectedTool.id);
 
     setFormVisible(false);
@@ -80,15 +77,16 @@ await supabase.from("tool_loans").insert([
     const tool = tools.find((t) => t.id === record.tool_id);
     if (!tool) return;
 
-await supabase
-  .from("tool_loans")
-  .update({ status: "returned", returned_at: new Date().toISOString() })
-  .eq("id", record.id);
-
+    await supabase
+      .from("tool_loans")
+      .update({ status: "returned", returned_at: new Date().toISOString() })
+      .eq("id", record.id);
 
     await supabase
       .from("tools")
-      .update({ stock: tool.stock + record.quantity, status: "Available" })
+      .update({
+        available_quantity: tool.available_quantity + record.quantity,
+      })
       .eq("id", tool.id);
 
     fetchData();
@@ -117,7 +115,7 @@ await supabase
                 <option value="">Pilih Tool</option>
                 {tools.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} — Stock: {t.stock}
+                    {t.name} — Available: {t.available_quantity}
                   </option>
                 ))}
               </select>
@@ -169,21 +167,14 @@ await supabase
               {records.map((r) => (
                 <tr key={r.id} className="border-b hover:bg-gray-50">
                   <td className="p-2">{r.tool?.name || "-"}</td>
-                  <td className="p-2">{r.borrower_name}</td>
+                  <td className="p-2">{r.notes || "-"}</td>
                   <td className="p-2 text-center">{r.quantity}</td>
-                  <td className="p-2 text-center">{new Date(r.borrow_date).toLocaleDateString()}</td>
+                  <td className="p-2 text-center">{r.borrowed_at ? new Date(r.borrowed_at).toLocaleDateString() : "-"}</td>
+                  <td className="p-2 text-center">{r.returned_at ? new Date(r.returned_at).toLocaleDateString() : "-"}</td>
+                  <td className="p-2 text-center capitalize">{r.status}</td>
                   <td className="p-2 text-center">
-                    {r.return_date ? new Date(r.return_date).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="p-2 text-center">{r.status}</td>
-                  <td className="p-2 text-center">
-                    {r.status === "Borrowed" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReturn(r)}
-                        title="Kembalikan Tool"
-                      >
+                    {r.status === "borrowed" && (
+                      <Button size="sm" variant="outline" onClick={() => handleReturn(r)} title="Kembalikan Tool">
                         <Undo2 className="h-4 w-4" />
                       </Button>
                     )}
