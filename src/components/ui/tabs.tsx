@@ -1,42 +1,38 @@
 // src/components/ui/tabs.tsx
-import React, { ReactNode, useState } from 'react';
+"use client";
 
-interface TabProps {
-  label: string;
-  value: string;
-  children: ReactNode;
-}
+import * as React from "react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
+import { cn } from "@/lib/utils";
 
-export const Tab = ({ children }: TabProps) => <>{children}</>;
+const Tabs = TabsPrimitive.Root;
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn("flex border-b border-gray-200", className)}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
 
-interface TabsProps {
-  children: React.ReactElement<TabProps>[];
-  defaultValue: string;
-}
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 focus-visible:outline-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600",
+      className
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
-export const Tabs = ({ children, defaultValue }: TabsProps) => {
-  const [activeTab, setActiveTab] = useState(defaultValue);
+const TabsContent = TabsPrimitive.Content;
 
-  return (
-    <div>
-      <div className="flex space-x-4 mb-4">
-        {children.map((child) => (
-          <button
-            key={child.props.value}
-            onClick={() => setActiveTab(child.props.value)}
-            className={`px-4 py-2 rounded ${
-              child.props.value === activeTab ? 'bg-blue-600 text-white' : 'bg-gray-200'
-            }`}
-          >
-            {child.props.label}
-          </button>
-        ))}
-      </div>
-      <div>
-        {children.map((child) =>
-          child.props.value === activeTab ? <div key={child.props.value}>{child}</div> : null
-        )}
-      </div>
-    </div>
-  );
-};
+export { Tabs, TabsList, TabsTrigger, TabsContent };
