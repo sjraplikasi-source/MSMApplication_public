@@ -197,6 +197,13 @@ const NAV_MINE: NavItem[] = [
   { path: "/mine-maintenance/settings", label: "Maintenance Settings", icon: Settings },
 ];
 
+  // Tambahkan menu Tool Room
+const NAV_TOOLROOM: NavItem[] = [
+  { path: "/toolroom/list", label: "Tool List", icon: Wrench },
+  { path: "/toolroom/borrow", label: "Borrow & Return", icon: ClipboardList },
+  { path: "/toolroom/reports", label: "Reports", icon: BarChart2 },
+];
+
   const NAV_SUPPLY: NavItem[] = [
 
     { path: "/supply/backlog", label: "SM — Backlog", icon: ClipboardList, prefix: "/supply/backlog" },
@@ -235,6 +242,8 @@ const NAV_MINE: NavItem[] = [
     if (!isSupplyOnly) menus.push({ id: 'backlog', title: 'Backlog', items: NAV_BACKLOG.filter(item => canSee(item.path)) });
 
     if (!isSupplyOnly) menus.push({ id: 'mine', title: 'Mine Maintenance', items: NAV_MINE.filter(item => canSee(item.path)) });
+
+    if (!isSupplyOnly) menus.push({ id: 'toolroom', title: 'Tool Room', items: NAV_TOOLROOM.filter(item => canSee(item.path)) });
 
     if (isSupplyOnly || isAdmin) menus.push({ id: 'SM', title: 'Supply Management', items: NAV_SUPPLY.filter(item => canSee(item.path)) });
 
