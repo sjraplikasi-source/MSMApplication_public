@@ -283,6 +283,17 @@ const HomePage: React.FC = () => {
                     <PlusCircle size={24} />
                     <span className="ml-2 text-sm font-medium">Add Report</span>
                 </button>
+
+              
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-800">
+                        Selamat Datang, {user?.name || user?.email || 'Pengguna'}!
+                    </h1>
+                    <p className="mt-1 text-gray-500">
+                        Berikut adalah ringkasan aktivitas dari sistem manajemen Anda.
+                    </p>
+                </div>
+
             </div>
         </div>
     );
