@@ -6,15 +6,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Check, Undo2 } from "lucide-react";
 
 interface BorrowRecord {
-  id: number;
-  tool_id: number;
-  borrower_name: string;
+  id: string;
+  tool_id: string;
+  employee_id?: string;
   quantity: number;
-  borrow_date: string;
-  return_date?: string;
-  status: "Borrowed" | "Returned";
+  borrowed_at: string;
+  expected_return_at?: string;
+  returned_at?: string;
+  status: "borrowed" | "returned";
+  notes?: string;
   tool?: { name: string };
 }
+
 
 interface Tool {
   id: number;
