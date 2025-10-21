@@ -6,13 +6,17 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 
 const Tabs = TabsPrimitive.Root;
+
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn("flex border-b border-gray-200", className)}
+    className={cn(
+      "flex border-b border-gray-200",
+      className
+    )}
     {...props}
   />
 ));
@@ -33,6 +37,23 @@ const TabsTrigger = React.forwardRef<
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
-const TabsContent = TabsPrimitive.Content;
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn("mt-4", className)}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+/**
+ * Optional backward compatibility wrapper.
+ * Beberapa modul lama mungkin masih mengimpor { Tab }.
+ * Kita definisikan sebagai alias dari TabsContent agar tidak error.
+ */
+const Tab = TabsContent;
+
+export { Tabs, TabsList, TabsTrigger, TabsContent, Tab };
