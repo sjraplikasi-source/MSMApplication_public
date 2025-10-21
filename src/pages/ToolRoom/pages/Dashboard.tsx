@@ -116,7 +116,7 @@ export default function ToolRoomDashboard() {
 
       {/* Tombol Aksi */}
       <div className="flex gap-3 flex-wrap">
-        <Button onClick={() => navigate("/toolroom/components/toolform")}>
+        <Button onClick={() => navigate("/toolroom/components/toolform")} variant="outline">
           Borrow / Return
         </Button>
         <Button onClick={() => navigate("/toolroom/reports")} variant="outline">
