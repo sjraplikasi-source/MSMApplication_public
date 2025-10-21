@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { QrCode, Loader2, Search, X, Plus, Minus } from "lucide-react";
 import toast from "react-hot-toast";
-import { BarcodeScanner } from "../components/BarcodeScanner"; // pastikan file ini ada
+import { BarcodeScanner } from "../components/BarcodeScanner";
 import { useAuth } from "@/context/AuthContext";
 
 interface Tool {
@@ -29,9 +29,7 @@ interface SelectedTool {
 export default function BorrowReturn() {
   const { user: currentUser } = useAuth();
   const [tools, setTools] = useState<Tool[]>([]);
-  const [employees, setEmployees] = useState<Empl
-    
-  oyee[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedTools, setSelectedTools] = useState<SelectedTool[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [expectedReturnDate, setExpectedReturnDate] = useState("");
@@ -53,7 +51,11 @@ export default function BorrowReturn() {
   // === FETCH DATA ===
   useEffect(() => {
     fetchTools();
-    fetchEmployees();
+    if (currentUser?.role === "admin") {
+      fetchEmployees();
+    } else {
+      setSelectedEmployee(currentUser || null); // auto set user sendiri
+    }
 
     const handleClickOutside = (event: MouseEvent) => {
       if (toolsRef.current && !toolsRef.current.contains(event.target as Node)) {
@@ -66,7 +68,7 @@ export default function BorrowReturn() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [currentUser]);
 
   const fetchTools = async () => {
     const { data, error } = await supabase.from("tools").select("*").gt("available_quantity", 0);
@@ -121,6 +123,12 @@ export default function BorrowReturn() {
   };
 
   const addTool = (tool: Tool) => {
+    // Non-admin hanya boleh pinjam 1 alat per transaksi
+    if (currentUser?.role !== "admin" && selectedTools.length >= 1) {
+      toast.error("User hanya dapat meminjam satu alat per transaksi.");
+      return;
+    }
+
     if (!selectedTools.some((s) => s.tool.id === tool.id)) {
       setSelectedTools((prev) => [...prev, { tool, quantity: 1 }]);
       clearToolSearch();
@@ -152,7 +160,7 @@ export default function BorrowReturn() {
       const { data, error } = await supabase
         .from("tools")
         .select("*")
-        .eq("id", result)
+        .or(`barcode_value.eq.${result}, id.eq.${result}`)
         .gt("available_quantity", 0)
         .single();
 
@@ -173,6 +181,7 @@ export default function BorrowReturn() {
   // === SUBMIT FORM ===
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (selectedTools.length === 0 || !selectedEmployee || !expectedReturnDate) {
       toast.error("Harap lengkapi semua field wajib");
       return;
@@ -187,9 +196,13 @@ export default function BorrowReturn() {
         }
       }
 
+      // Admin bisa pinjam atas nama siapa saja
+      const borrowerId =
+        currentUser?.role === "admin" ? selectedEmployee.id : currentUser?.id;
+
       const loanRecords = selectedTools.map((s) => ({
         tool_id: s.tool.id,
-        employee_id: selectedEmployee.id,
+        employee_id: borrowerId,
         quantity: s.quantity,
         expected_return_at: expectedReturnDate,
         notes,
@@ -209,7 +222,7 @@ export default function BorrowReturn() {
 
       toast.success("Loan berhasil dibuat");
       setSelectedTools([]);
-      setSelectedEmployee(null);
+      if (currentUser?.role === "admin") setSelectedEmployee(null);
       setExpectedReturnDate("");
       setNotes("");
       fetchTools();
@@ -361,58 +374,65 @@ export default function BorrowReturn() {
       )}
 
       {/* EMPLOYEE SELECTION */}
-      <div ref={employeesRef}>
-        <label className="block text-sm font-medium text-gray-700">Employee</label>
-        <div className="relative mt-1">
-          <input
-            type="text"
-            placeholder="Search employees..."
-            value={employeeSearch}
-            onChange={(e) => {
-              setEmployeeSearch(e.target.value);
-              setShowEmployeeDropdown(true);
-            }}
-            onFocus={() => setShowEmployeeDropdown(true)}
-            className="block w-full rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500"
-          />
-          {selectedEmployee ? (
-            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
-              <p className="font-medium">{selectedEmployee.name}</p>
-              <p className="text-sm text-gray-500">ID: {selectedEmployee.register_number}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedEmployee(null);
-                  setEmployeeSearch("");
-                  setShowEmployeeDropdown(true);
-                }}
-                className="mt-2 text-sm text-red-600 hover:text-red-800"
-              >
-                Clear Selection
-              </button>
-            </div>
-          ) : (
-            showEmployeeDropdown &&
-            filteredEmployees.length > 0 && (
-              <ul className="absolute z-10 w-full max-h-48 overflow-auto bg-white border rounded-md shadow-lg mt-1">
-                {filteredEmployees.map((emp) => (
-                  <li
-                    key={emp.id}
-                    onClick={() => {
-                      setSelectedEmployee(emp);
-                      setShowEmployeeDropdown(false);
-                    }}
-                    className="p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                  >
-                    <p className="font-medium">{emp.name}</p>
-                    <p className="text-sm text-gray-500">ID: {emp.register_number}</p>
-                  </li>
-                ))}
-              </ul>
-            )
-          )}
+      {currentUser?.role === "admin" ? (
+        <div ref={employeesRef}>
+          <label className="block text-sm font-medium text-gray-700">Employee</label>
+          <div className="relative mt-1">
+            <input
+              type="text"
+              placeholder="Search employees..."
+              value={employeeSearch}
+              onChange={(e) => {
+                setEmployeeSearch(e.target.value);
+                setShowEmployeeDropdown(true);
+              }}
+              onFocus={() => setShowEmployeeDropdown(true)}
+              className="block w-full rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500"
+            />
+            {selectedEmployee ? (
+              <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
+                <p className="font-medium">{selectedEmployee.name}</p>
+                <p className="text-sm text-gray-500">ID: {selectedEmployee.register_number}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedEmployee(null);
+                    setEmployeeSearch("");
+                    setShowEmployeeDropdown(true);
+                  }}
+                  className="mt-2 text-sm text-red-600 hover:text-red-800"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            ) : (
+              showEmployeeDropdown &&
+              filteredEmployees.length > 0 && (
+                <ul className="absolute z-10 w-full max-h-48 overflow-auto bg-white border rounded-md shadow-lg mt-1">
+                  {filteredEmployees.map((emp) => (
+                    <li
+                      key={emp.id}
+                      onClick={() => {
+                        setSelectedEmployee(emp);
+                        setShowEmployeeDropdown(false);
+                      }}
+                      className="p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    >
+                      <p className="font-medium">{emp.name}</p>
+                      <p className="text-sm text-gray-500">ID: {emp.register_number}</p>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+          <p className="font-medium">{currentUser?.name}</p>
+          <p className="text-sm text-gray-500">ID: {currentUser?.register_number}</p>
+        </div>
+      )}
 
       {/* RETURN DATE */}
       <div>
@@ -438,7 +458,7 @@ export default function BorrowReturn() {
 
       <button
         type="submit"
-        disabled={loading || selectedTools.length === 0 || !selectedEmployee || !expectedReturnDate}
+        disabled={loading || selectedTools.length === 0 || !expectedReturnDate}
         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400"
       >
         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Create Loan"}
