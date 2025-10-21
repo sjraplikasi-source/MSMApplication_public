@@ -289,13 +289,4 @@ const HomePage: React.FC = () => {
 };
 
 
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">
-                        Selamat Datang, {user?.name || user?.email || 'Pengguna'}!
-                    </h1>
-                    <p className="mt-1 text-gray-500">
-                        Berikut adalah ringkasan aktivitas dari sistem manajemen Anda.
-                    </p>
-                </div>
-
 export default HomePage;
