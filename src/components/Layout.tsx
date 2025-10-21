@@ -199,6 +199,7 @@ const NAV_MINE: NavItem[] = [
 
   // Tambahkan menu Tool Room
 const NAV_TOOLROOM: NavItem[] = [
+  { path: "/toolroom/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/toolroom/list", label: "Tool List", icon: Wrench },
   { path: "/toolroom/borrow", label: "Borrow & Return", icon: ClipboardList },
   { path: "/toolroom/reports", label: "Reports", icon: BarChart2 },
