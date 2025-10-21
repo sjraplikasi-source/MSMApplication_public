@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, RefreshCw, FileImage } from "lucide-react";
+import { FileDown, RefreshCw, FileImage, X } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 
@@ -15,6 +15,7 @@ export default function ToolRoomReports() {
     endDate: "",
     status: "",
   });
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRecords();
@@ -28,7 +29,6 @@ export default function ToolRoomReports() {
         .select("*, tools(name), employees(name, register_number)")
         .order("borrowed_at", { ascending: false });
 
-      // Filter tanggal
       if (filter.startDate)
         query = query.gte(
           "borrowed_at",
@@ -39,8 +39,6 @@ export default function ToolRoomReports() {
           "borrowed_at",
           new Date(filter.endDate).toISOString()
         );
-
-      // Filter status
       if (filter.status) query = query.eq("status", filter.status);
 
       const { data, error } = await query;
@@ -92,7 +90,7 @@ export default function ToolRoomReports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <h1 className="text-2xl font-bold text-gray-800">Tool Room Reports</h1>
 
       {/* Filter Section */}
@@ -204,19 +202,17 @@ export default function ToolRoomReports() {
                 </td>
                 <td className="py-2 px-4">
                   {r.return_photo_url ? (
-                    <a
-                      href={r.return_photo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-2"
+                    <button
+                      onClick={() => setSelectedImage(r.return_photo_url)}
+                      className="flex items-center space-x-2 group"
                     >
                       <img
                         src={r.return_photo_url}
                         alt="Return"
-                        className="h-10 w-10 object-cover rounded-md border border-gray-200 hover:opacity-80 transition"
+                        className="h-10 w-10 object-cover rounded-md border border-gray-200 group-hover:opacity-80 transition"
                       />
                       <FileImage className="h-4 w-4 text-gray-400" />
-                    </a>
+                    </button>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
@@ -236,6 +232,31 @@ export default function ToolRoomReports() {
           </tbody>
         </table>
       </div>
+
+      {/* 📸 Modal Preview Gambar */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 cursor-zoom-out"
+        >
+          <div
+            className="relative max-w-3xl w-full p-4 flex justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-2 right-2 bg-gray-800 text-white rounded-full p-1 hover:bg-red-600 transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="Tool Return"
+              className="max-h-[80vh] object-contain rounded-lg shadow-2xl border border-gray-700"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
