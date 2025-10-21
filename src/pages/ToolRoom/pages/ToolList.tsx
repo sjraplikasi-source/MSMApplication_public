@@ -50,10 +50,10 @@ export default function ToolList() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Daftar Tools</h2>
-        {currentUser?.role === 'admin' && (
+       
         <Button onClick={() => { setEditingTool(null); setShowForm(true); }}>
           <Plus className="h-4 w-4 mr-2" /> Tambah Tool
-        </Button>)}
+        </Button>
       </div>
 
       {showForm && (
