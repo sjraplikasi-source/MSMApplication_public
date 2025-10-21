@@ -9,15 +9,13 @@ import {
     ArrowRight,
     PlusCircle,
     Loader2,
-    ListPlus,
-    HardHat,
-    Tool,
-    CheckCircle
+    ListPlus // Icon baru untuk Backlog
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '../components/ui/button';
+import { HardHat } from 'lucide-react';
 
 // Tipe data untuk summary
 interface SummaryData {
@@ -49,6 +47,7 @@ const HomePage: React.FC = () => {
                 const today = new Date().toISOString().split('T')[0];
                 const openStatuses = '("closed", "completed")'; // Status yang dianggap selesai
 
+                // --- Query untuk R&M Activity dari tabel backlogs ---
                 const { count: todayCount } = await supabase
                     .from('backlogs')
                     .select('*', { count: 'exact', head: true })
@@ -60,20 +59,31 @@ const HomePage: React.FC = () => {
                     .lt('scheduled_date', today)
                     .not('status', 'in', openStatuses);
 
+                // --- Query untuk Backlog Prioritas Tinggi ---
                 const { count: highPriorityCount } = await supabase
                     .from('backlogs')
                     .select('*', { count: 'exact', head: true })
                     .not('status', 'in', openStatuses)
                     .eq('priority', 'High');
 
+                // --- Query untuk Supply Management (Menunggu Part) ---
                 const { data: waitingForPartsData, error: rpcError } = await supabase.rpc('get_waiting_for_parts_count');
                 if (rpcError) throw rpcError;
                 
+                // Set data ke state
                 setSummaryData({
-                    rmActivity: { today: todayCount ?? 0, overdue: overdueCount ?? 0 },
-                    backlog: { highPriority: highPriorityCount ?? 0 },
-                    supply: { waitingForParts: waitingForPartsData ?? 0 }
+                    rmActivity: {
+                        today: todayCount ?? 0,
+                        overdue: overdueCount ?? 0,
+                    },
+                    backlog: {
+                        highPriority: highPriorityCount ?? 0,
+                    },
+                    supply: {
+                        waitingForParts: waitingForPartsData ?? 0,
+                    }
                 });
+
             } catch (error) {
                 console.error("Gagal mengambil data summary:", error);
                 setSummaryData({
@@ -89,7 +99,9 @@ const HomePage: React.FC = () => {
         fetchSummaryData();
     }, []);
 
-    const handleNavigate = (path: string) => navigate(path);
+    const handleNavigate = (path: string) => {
+        navigate(path);
+    };
 
     // Tampilan saat loading
     if (loading) {
@@ -102,7 +114,7 @@ const HomePage: React.FC = () => {
     }
 
     return (
-        <div className="p-6 sm:p-8 bg-gray-50 min-h-screen relative">
+        <div className="p-6 sm:p-8 bg-gray-50 min-h-screen relative"> {/* Tambahkan relative di sini */}
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">
@@ -116,7 +128,7 @@ const HomePage: React.FC = () => {
 
             <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 
-                {/* 1. R&M Activity */}
+                {/* 1. R&M Activity Card */}
                 <div 
                     onClick={() => handleNavigate('/dashboard')}
                     className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
@@ -125,10 +137,7 @@ const HomePage: React.FC = () => {
                         <div className="bg-orange-100 p-3 rounded-lg"><Wrench className="text-orange-500" size={28} /></div>
                         <ArrowRight className="text-gray-400 group-hover:text-orange-500 transition-colors" />
                     </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">R&M Activity</h3>
-                        <p className="text-sm text-gray-500 mt-1">Jadwal & Laporan Perbaikan</p>
-                    </div>
+                    <div className="mt-4"><h3 className="text-xl font-bold text-gray-800">R&M Activity</h3><p className="text-sm text-gray-500 mt-1">Jadwal & Laporan Perbaikan</p></div>
                     <div className="mt-6 border-t pt-4 space-y-2 text-sm">
                         <div className="flex justify-between">
                             <span className="text-gray-600">Jadwal Hari Ini:</span>
@@ -141,7 +150,7 @@ const HomePage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 2. Backlog Management */}
+                {/* 2. Backlog Management Card */}
                 <div 
                     onClick={() => handleNavigate('/backlog/dashboard')}
                     className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
@@ -150,17 +159,14 @@ const HomePage: React.FC = () => {
                         <div className="bg-red-100 p-3 rounded-lg"><ClipboardList className="text-red-500" size={28} /></div>
                         <ArrowRight className="text-gray-400 group-hover:text-red-500 transition-colors" />
                     </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Backlog</h3>
-                        <p className="text-sm text-gray-500 mt-1">Manajemen Pekerjaan Tertunda</p>
-                    </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-4"><h3 className="text-xl font-bold text-gray-800">Backlog</h3><p className="text-sm text-gray-500 mt-1">Manajemen Pekerjaan Tertunda</p></div>
+                     <div className="mt-6 border-t pt-4 flex justify-between text-sm">
                         <span className="text-gray-600">Prioritas Tinggi:</span>
                         <span className="font-bold text-red-600">{summaryData?.backlog.highPriority}</span>
                     </div>
                 </div>
 
-                {/* 3. Supply Management */}
+                {/* 3. Supply Management Card */}
                 <div 
                     onClick={() => handleNavigate('/supply/backlog')}
                     className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
@@ -169,59 +175,36 @@ const HomePage: React.FC = () => {
                         <div className="bg-green-100 p-3 rounded-lg"><Warehouse className="text-green-500" size={28} /></div>
                         <ArrowRight className="text-gray-400 group-hover:text-green-500 transition-colors" />
                     </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Supply Management</h3>
-                        <p className="text-sm text-gray-500 mt-1">Stok & Pengadaan Sparepart</p>
-                    </div>
+                    <div className="mt-4"><h3 className="text-xl font-bold text-gray-800">Supply Management</h3><p className="text-sm text-gray-500 mt-1">Stok & Pengadaan Sparepart</p></div>
                     <div className="mt-6 border-t pt-4 flex justify-between text-sm">
                         <span className="text-gray-600">Menunggu Part:</span>
                         <span className="font-bold text-green-600">{summaryData?.supply.waitingForParts}</span>
                     </div>
                 </div>
 
-                {/* 4. Mine Maintenance */}
-                <div 
-                    onClick={() => handleNavigate('/mine-maintenance')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
-                >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-blue-100 p-3 rounded-lg">
-                            <HardHat className="text-blue-600" size={28} />
-                        </div>
-                        <ArrowRight className="text-gray-400 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Mine Maintenance</h3>
-                        <p className="text-sm text-gray-500 mt-1">Equipment, Komponen & Hour Meter</p>
-                    </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-bold text-blue-600">Online</span>
-                    </div>
-                </div>
+              {/* 4. Mine Maintenance Card */}
+<div 
+    onClick={() => handleNavigate('/mine-maintenance')}
+    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+>
+    <div className="flex justify-between items-start">
+        <div className="bg-blue-100 p-3 rounded-lg">
+            <HardHat className="text-blue-600" size={28} />
+        </div>
+        <ArrowRight className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+    </div>
+    <div className="mt-4">
+        <h3 className="text-xl font-bold text-gray-800">Mine Maintenance</h3>
+        <p className="text-sm text-gray-500 mt-1">Equipment, Komponen & Hour Meter</p>
+    </div>
+    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+        <span className="text-gray-600">Status:</span>
+        <span className="font-bold text-blue-600">Online</span>
+    </div>
+</div>
 
-                {/* 5. 🧰 Tool Room */}
-                <div 
-                    onClick={() => handleNavigate('/toolroom/dashboard')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
-                >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-indigo-100 p-3 rounded-lg">
-                            <Tool className="text-indigo-600" size={28} />
-                        </div>
-                        <ArrowRight className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Tool Room</h3>
-                        <p className="text-sm text-gray-500 mt-1">Peminjaman, Pengembalian & Stok Alat</p>
-                    </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-bold text-indigo-600">Active</span>
-                    </div>
-                </div>
-
-                {/* 6. Administrator */}
+              
+                {/* 5. Administrator Card */}
                 <div 
                     onClick={() => handleNavigate('/konfigurasi')}
                     className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
@@ -230,57 +213,33 @@ const HomePage: React.FC = () => {
                         <div className="bg-gray-100 p-3 rounded-lg"><Shield className="text-gray-500" size={28} /></div>
                         <ArrowRight className="text-gray-400 group-hover:text-gray-600 transition-colors" />
                     </div>
-                    <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Administrator</h3>
-                        <p className="text-sm text-gray-500 mt-1">Pengaturan Pengguna & Sistem</p>
-                    </div>
+                    <div className="mt-4"><h3 className="text-xl font-bold text-gray-800">Administrator</h3><p className="text-sm text-gray-500 mt-1">Pengaturan Pengguna & Sistem</p></div>
                     <div className="mt-6 border-t pt-4 flex justify-between text-sm">
-                        <span className="text-gray-600">Akses:</span>
-                        <span className="font-bold text-gray-800">Level Admin</span>
+                             <span className="text-gray-600">Akses Pengaturan</span><span className="font-bold text-gray-800">Level Admin</span>
                     </div>
                 </div>
             </main>
             
-            {/* 🔘 Floating Buttons */}
+            {/* Tombol Melayang */}
             <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2">
-                {/* Add Tool Borrow */}
-                <button
-                    onClick={() => handleNavigate('/toolroom/borrow')}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Form Peminjaman"
-                >
-                    <ClipboardList size={24} />
-                    <span className="ml-2 text-sm font-medium">Borrow Tool</span>
-                </button>
-
-                {/* Return Tool */}
-                <button
-                    onClick={() => handleNavigate('/toolroom/returntools')}
-                    className="bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Form Pengembalian"
-                >
-                    <CheckCircle size={24} />
-                    <span className="ml-2 text-sm font-medium">Return Tool</span>
-                </button>
-
-                {/* Add Backlog */}
+                {/* Tombol Add Backlog */}
                 <button
                     onClick={() => handleNavigate('/Backlog/input')}
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
                     title="Add Backlog"
                 >
                     <ListPlus size={24} />
-                    <span className="ml-2 text-sm font-medium">Add Backlog</span>
+                  <span className="text-sm font-medium">Add Backlog</span>
                 </button>
 
-                {/* Add Report */}
+                {/* Tombol Add Report */}
                 <button
                     onClick={() => handleNavigate('/reports/new')}
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
                     title="Add Report"
                 >
                     <PlusCircle size={24} />
-                    <span className="ml-2 text-sm font-medium">Add Report</span>
+                  <span className="text-sm font-medium">Add Report</span>
                 </button>
             </div>
         </div>
