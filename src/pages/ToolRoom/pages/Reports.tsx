@@ -21,18 +21,21 @@ export default function Reports() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
   const fetchReports = async () => {
-    const { data: tools } = await supabase.from("tools").select("*");
-    const { data: transactions } = await supabase
-      .from("tool_transactions")
-      .select("*, tool:tools(name)")
-      .order("borrow_date", { ascending: false })
-      .limit(10);
+const { data: tools } = await supabase.from("tools").select("id, name, quantity, available_quantity, category");
+const { data: transactions } = await supabase
+  .from("tool_loans")
+  .select("*, tool:tools(name)")
+  .order("borrowed_at", { ascending: false })
+  .limit(10);
+
 
     if (tools) {
       setSummary({
         total_tools: tools.length,
-        total_borrowed: tools.filter((t) => t.status === "Borrowed").length,
-        total_available: tools.filter((t) => t.status === "Available").length,
+total_available: tools.filter(t => (t.available_quantity ?? 0) > 0).length,
+total_borrowed: tools.filter(t => (t.available_quantity ?? 0) < (t.quantity ?? 0)).length,
+total_maintenance: 0,
+
         total_maintenance: tools.filter((t) => t.status === "Maintenance").length,
       });
     }
