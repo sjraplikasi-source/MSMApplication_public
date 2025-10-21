@@ -5,40 +5,35 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface Summary {
   total_tools: number;
-  total_borrowed: number;
   total_available: number;
-  total_maintenance: number;
+  total_borrowed: number;
 }
 
 export default function Reports() {
   const [summary, setSummary] = useState<Summary>({
     total_tools: 0,
-    total_borrowed: 0,
     total_available: 0,
-    total_maintenance: 0,
+    total_borrowed: 0,
   });
 
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
   const fetchReports = async () => {
-const { data: tools } = await supabase.from("tools").select("id, name, quantity, available_quantity, category");
-const { data: transactions } = await supabase
-  .from("tool_loans")
-  .select("*, tool:tools(name)")
-  .order("borrowed_at", { ascending: false })
-  .limit(10);
-
+    const { data: tools } = await supabase.from("tools").select("id, name, quantity, available_quantity");
+    const { data: transactions } = await supabase
+      .from("tool_loans")
+      .select("*, tool:tools(name)")
+      .order("borrowed_at", { ascending: false })
+      .limit(10);
 
     if (tools) {
       setSummary({
         total_tools: tools.length,
-total_available: tools.filter(t => (t.available_quantity ?? 0) > 0).length,
-total_borrowed: tools.filter(t => (t.available_quantity ?? 0) < (t.quantity ?? 0)).length,
-total_maintenance: 0,
-
-        total_maintenance: tools.filter((t) => t.status === "Maintenance").length,
+        total_available: tools.filter((t) => (t.available_quantity ?? 0) > 0).length,
+        total_borrowed: tools.filter((t) => (t.available_quantity ?? 0) < (t.quantity ?? 0)).length,
       });
     }
+
     setRecentTransactions(transactions || []);
   };
 
@@ -50,15 +45,27 @@ total_maintenance: 0,
     <div className="space-y-6">
       <h2 className="text-xl font-semibold">Laporan Tool Room</h2>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card><CardContent className="p-4 text-center"><p className="text-gray-500 text-sm">Total Tools</p><p className="text-2xl font-bold">{summary.total_tools}</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-gray-500 text-sm">Available</p><p className="text-2xl font-bold text-green-600">{summary.total_available}</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-gray-500 text-sm">Borrowed</p><p className="text-2xl font-bold text-blue-600">{summary.total_borrowed}</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-gray-500 text-sm">Maintenance</p><p className="text-2xl font-bold text-orange-600">{summary.total_maintenance}</p></CardContent></Card>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-gray-500 text-sm">Total Tools</p>
+            <p className="text-2xl font-bold">{summary.total_tools}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-gray-500 text-sm">Available</p>
+            <p className="text-2xl font-bold text-green-600">{summary.total_available}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-gray-500 text-sm">Borrowed</p>
+            <p className="text-2xl font-bold text-blue-600">{summary.total_borrowed}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Recent Transactions */}
       <Card>
         <CardContent>
           <h3 className="text-lg font-semibold mb-3">Transaksi Terbaru</h3>
@@ -76,10 +83,10 @@ total_maintenance: 0,
               {recentTransactions.map((t) => (
                 <tr key={t.id} className="border-b hover:bg-gray-50">
                   <td className="p-2">{t.tool?.name}</td>
-                  <td className="p-2">{t.borrower_name}</td>
+                  <td className="p-2">{t.notes}</td>
                   <td className="p-2 text-center">{t.quantity}</td>
-                  <td className="p-2 text-center">{new Date(t.borrow_date).toLocaleDateString()}</td>
-                  <td className="p-2 text-center">{t.status}</td>
+                  <td className="p-2 text-center">{new Date(t.borrowed_at).toLocaleDateString()}</td>
+                  <td className="p-2 text-center capitalize">{t.status}</td>
                 </tr>
               ))}
             </tbody>
