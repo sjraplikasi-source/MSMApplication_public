@@ -14,6 +14,7 @@ export default function ToolRoomRouter() {
       <Route path="borrow" element={<BorrowReturn />} />
       <Route path="reports" element={<Reports />} />
       <Route path="detail/:id" element={<ToolDetail />} />
+      <Route path="dashboard" element={<Dashboard />} />
     </Routes>
   );
 }
