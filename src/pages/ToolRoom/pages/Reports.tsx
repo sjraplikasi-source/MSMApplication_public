@@ -2,98 +2,213 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { FileDown, RefreshCw } from "lucide-react";
+import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 
-interface Summary {
-  total_tools: number;
-  total_available: number;
-  total_borrowed: number;
-}
-
-export default function Reports() {
-  const [summary, setSummary] = useState<Summary>({
-    total_tools: 0,
-    total_available: 0,
-    total_borrowed: 0,
+export default function ToolRoomReports() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState({
+    startDate: "",
+    endDate: "",
+    status: "",
   });
 
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
-  const fetchReports = async () => {
-    const { data: tools } = await supabase.from("tools").select("id, name, quantity, available_quantity");
-    const { data: transactions } = await supabase
-      .from("tool_loans")
-      .select("*, tool:tools(name)")
-      .order("borrowed_at", { ascending: false })
-      .limit(10);
+  const fetchRecords = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from("tool_loans")
+        .select("*, tools(name), employees(name, register_number)")
+        .order("borrowed_at", { ascending: false });
 
-    if (tools) {
-      setSummary({
-        total_tools: tools.length,
-        total_available: tools.filter((t) => (t.available_quantity ?? 0) > 0).length,
-        total_borrowed: tools.filter((t) => (t.available_quantity ?? 0) < (t.quantity ?? 0)).length,
-      });
+      // Filter tanggal
+      if (filter.startDate)
+        query = query.gte("borrowed_at", new Date(filter.startDate).toISOString());
+      if (filter.endDate)
+        query = query.lte("borrowed_at", new Date(filter.endDate).toISOString());
+
+      // Filter status
+      if (filter.status) query = query.eq("status", filter.status);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal memuat data laporan");
+    } finally {
+      setLoading(false);
     }
-
-    setRecentTransactions(transactions || []);
   };
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
+  const exportToExcel = () => {
+    if (records.length === 0) {
+      toast.error("Tidak ada data untuk diexport");
+      return;
+    }
+
+    const exportData = records.map((r) => ({
+      Tool: r.tools?.name || "-",
+      Employee: r.employees?.name || "-",
+      "Employee ID": r.employees?.register_number || "-",
+      Quantity: r.quantity,
+      "Borrowed At": r.borrowed_at
+        ? new Date(r.borrowed_at).toLocaleString()
+        : "-",
+      "Expected Return": r.expected_return_at
+        ? new Date(r.expected_return_at).toLocaleString()
+        : "-",
+      "Returned At": r.returned_at
+        ? new Date(r.returned_at).toLocaleString()
+        : "-",
+      Status: r.status,
+      Notes: r.notes || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tool Room Reports");
+    XLSX.writeFile(wb, "ToolRoom_Reports.xlsx");
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilter((prev) => ({ ...prev, [name]: value }));
+  };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Laporan Tool Room</h2>
+      <h1 className="text-2xl font-bold text-gray-800">Tool Room Reports</h1>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-gray-500 text-sm">Total Tools</p>
-            <p className="text-2xl font-bold">{summary.total_tools}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-gray-500 text-sm">Available</p>
-            <p className="text-2xl font-bold text-green-600">{summary.total_available}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-gray-500 text-sm">Borrowed</p>
-            <p className="text-2xl font-bold text-blue-600">{summary.total_borrowed}</p>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Filter Section */}
       <Card>
-        <CardContent>
-          <h3 className="text-lg font-semibold mb-3">Transaksi Terbaru</h3>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2 text-left">Tool</th>
-                <th className="p-2 text-left">Peminjam</th>
-                <th className="p-2 text-center">Qty</th>
-                <th className="p-2 text-center">Tanggal Pinjam</th>
-                <th className="p-2 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTransactions.map((t) => (
-                <tr key={t.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{t.tool?.name}</td>
-                  <td className="p-2">{t.notes}</td>
-                  <td className="p-2 text-center">{t.quantity}</td>
-                  <td className="p-2 text-center">{new Date(t.borrowed_at).toLocaleDateString()}</td>
-                  <td className="p-2 text-center capitalize">{t.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {recentTransactions.length === 0 && <p className="text-gray-500 text-sm p-3">Belum ada transaksi.</p>}
+        <CardContent className="p-4 flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-sm text-gray-600">Start Date</label>
+            <input
+              type="date"
+              name="startDate"
+              value={filter.startDate}
+              onChange={handleFilterChange}
+              className="border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600">End Date</label>
+            <input
+              type="date"
+              name="endDate"
+              value={filter.endDate}
+              onChange={handleFilterChange}
+              className="border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600">Status</label>
+            <select
+              name="status"
+              value={filter.status}
+              onChange={handleFilterChange}
+              className="border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">All</option>
+              <option value="borrowed">Borrowed</option>
+              <option value="returned">Returned</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={fetchRecords} disabled={loading}>
+              {loading ? (
+                <RefreshCw className="animate-spin h-4 w-4" />
+              ) : (
+                "Apply Filter"
+              )}
+            </Button>
+            <Button
+              onClick={exportToExcel}
+              variant="outline"
+              disabled={records.length === 0}
+            >
+              <FileDown className="h-4 w-4 mr-2" /> Export
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Data Table */}
+      <div className="bg-white border rounded-lg shadow-sm overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+            <tr>
+              <th className="py-2 px-4 text-left">Tool</th>
+              <th className="py-2 px-4 text-left">Employee</th>
+              <th className="py-2 px-4 text-left">Qty</th>
+              <th className="py-2 px-4 text-left">Borrowed At</th>
+              <th className="py-2 px-4 text-left">Expected Return</th>
+              <th className="py-2 px-4 text-left">Returned At</th>
+              <th className="py-2 px-4 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((r) => (
+              <tr key={r.id} className="border-t hover:bg-gray-50">
+                <td className="py-2 px-4">{r.tools?.name || "-"}</td>
+                <td className="py-2 px-4">
+                  {r.employees?.name || "-"}{" "}
+                  <span className="text-gray-400 text-xs">
+                    ({r.employees?.register_number})
+                  </span>
+                </td>
+                <td className="py-2 px-4">{r.quantity}</td>
+                <td className="py-2 px-4">
+                  {r.borrowed_at
+                    ? new Date(r.borrowed_at).toLocaleDateString()
+                    : "-"}
+                </td>
+                <td className="py-2 px-4">
+                  {r.expected_return_at
+                    ? new Date(r.expected_return_at).toLocaleDateString()
+                    : "-"}
+                </td>
+                <td className="py-2 px-4">
+                  {r.returned_at
+                    ? new Date(r.returned_at).toLocaleDateString()
+                    : "-"}
+                </td>
+                <td
+                  className={`py-2 px-4 font-semibold ${
+                    r.status === "returned"
+                      ? "text-green-600"
+                      : r.status === "borrowed"
+                      ? "text-yellow-600"
+                      : "text-gray-600"
+                  }`}
+                >
+                  {r.status}
+                </td>
+              </tr>
+            ))}
+            {records.length === 0 && (
+              <tr>
+                <td
+                  className="py-3 px-4 text-center text-gray-500"
+                  colSpan={7}
+                >
+                  No records found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
