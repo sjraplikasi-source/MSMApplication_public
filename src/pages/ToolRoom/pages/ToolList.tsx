@@ -13,7 +13,7 @@ interface ToolItem {
   category: string;
   stock: number;
   location: string;
-  status: string;
+  //status: string;
 }
 
 export default function ToolList() {
@@ -73,8 +73,9 @@ export default function ToolList() {
                 <th className="text-left p-2">Nama Tool</th>
                 <th className="text-left p-2">Kategori</th>
                 <th className="text-left p-2">Lokasi</th>
-                <th className="text-center p-2">Stock</th>
-                <th className="text-center p-2">Status</th>
+<th className="text-center p-2">Qty Total</th>
+<th className="text-center p-2">Available</th>
+
                 <th className="text-center p-2">Aksi</th>
               </tr>
             </thead>
@@ -84,8 +85,9 @@ export default function ToolList() {
                   <td className="p-2">{t.name}</td>
                   <td className="p-2">{t.category}</td>
                   <td className="p-2">{t.location}</td>
-                  <td className="p-2 text-center">{t.stock}</td>
-                  <td className="p-2 text-center">{t.status}</td>
+<td className="p-2 text-center">{t.quantity}</td>
+<td className="p-2 text-center">{t.available_quantity}</td>
+
                   <td className="p-2 text-center space-x-2">
                     <Button size="sm" variant="outline" onClick={() => handleEdit(t)}>
                       <Edit className="h-4 w-4" />
