@@ -256,7 +256,7 @@ const HomePage: React.FC = () => {
 
                 {/* Return Tool */}
                 <button
-                    onClick={() => handleNavigate('/toolroom/returntools')}
+                    onClick={() => handleNavigate('/toolroom/return-tools')}
                     className="bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
                     title="Form Pengembalian"
                 >
@@ -286,9 +286,6 @@ const HomePage: React.FC = () => {
 
               
                 <div>
-                    <h1 className="text-3xl font-bold text-red-800">
-                        SAMAWA SABALONG SAMALEWA
-                    </h1>
                     <p className="mt-1 text-gray-500">
                         Site MSM Dept. PT Sumbawa Jutaraya
                     </p>
