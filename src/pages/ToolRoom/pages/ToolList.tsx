@@ -23,7 +23,11 @@ export default function ToolList() {
 
   // Ambil data dari Supabase
   const fetchTools = async () => {
-    const { data, error } = await supabase.from("tools").select("*").order("name", { ascending: true });
+    const { data, error } = await supabase
+  .from("tools")
+  .select("id, name, category, quantity, available_quantity, location, description")
+  .order("name", { ascending: true });
+
     if (error) console.error("Error loading tools:", error);
     else setTools(data || []);
   };
