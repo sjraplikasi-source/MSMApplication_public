@@ -5,6 +5,7 @@ import ToolList from "./pages/ToolList";
 import BorrowReturn from "./pages/BorrowReturn";
 import Reports from "./pages/Reports";
 import ToolDetail from "./pages/ToolDetail";
+import Dashboard from "./pages/Dashboard";
 
 export default function ToolRoomRouter() {
   return (
