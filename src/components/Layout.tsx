@@ -203,7 +203,8 @@ const NAV_TOOLROOM: NavItem[] = [
   { path: "/toolroom/list", label: "Tool List", icon: Wrench },
   { path: "/toolroom/borrow", label: "Form Loan", icon: ClipboardList },
   { path: "/toolroom/reports", label: "Reports", icon: BarChart2 },
-  { path: "/toolroom/ReturnTools", label: "Return Tools", icon: CheckCircle },
+  { path: "/toolroom/return-tools", label: "Return Tools", icon: CheckCircle },
+
 ];
 
   const NAV_SUPPLY: NavItem[] = [
