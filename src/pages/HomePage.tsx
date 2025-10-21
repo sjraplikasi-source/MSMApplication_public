@@ -286,7 +286,7 @@ const HomePage: React.FC = () => {
 
               
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">
+                    <h1 className="text-3xl font-bold text-red-800">
                         SAMAWA SABALONG SAMALEWA
                     </h1>
                     <p className="mt-1 text-gray-500">
