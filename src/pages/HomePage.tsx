@@ -288,4 +288,8 @@ const HomePage: React.FC = () => {
     );
 };
 
+                    <p className="mt-1 text-gray-500">
+                        Berikut adalah ringkasan aktivitas dari sistem manajemen Anda.
+                    </p>
+
 export default HomePage;
