@@ -105,7 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isSupplyOnly = ["sm","supply","supplymanager","supplymanagement"].includes(roleKey);
 
   
-
+// tempat tambah role
   const ROLE_ACCESS: Record<string,string[]> = {
 
     admin: ["*"], administrator: ["*"], superadmin: ["*"],
