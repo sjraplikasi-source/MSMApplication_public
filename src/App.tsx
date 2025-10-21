@@ -40,6 +40,8 @@ import EnergyMonitoring from "./pages/Operational/EnergyMonitoring";
 
 import { useAuth } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
+import ToolRoom from "./pages/ToolRoom";
+
 
 // Lazy load modul MineMaintenance
 const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
@@ -122,6 +124,8 @@ function AppRoutes() {
         <Route path="/operational/energy-input" element={<ProtectedRoute><Layout><EnergyInput /></Layout></ProtectedRoute>} />
         <Route path="/operational/energy-monitoring" element={<ProtectedRoute><Layout><EnergyMonitoring /></Layout></ProtectedRoute>} />
 
+        <Route path="/toolroom/*" element={<ProtectedRoute><Layout><ToolRoom /></Layout></ProtectedRoute>} />
+        
         {/* ✅ Mine Maintenance Module */}
         <Route
           path="/mine-maintenance/*"
