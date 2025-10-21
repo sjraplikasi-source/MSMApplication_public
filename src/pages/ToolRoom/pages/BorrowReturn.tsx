@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { QrCode, Loader2, Search, X, Plus, Minus } from "lucide-react";
 import toast from "react-hot-toast";
 import { BarcodeScanner } from "../components/BarcodeScanner"; // pastikan file ini ada
+import { useAuth } from "@/context/AuthContext";
 
 interface Tool {
   id: string;
@@ -26,8 +27,11 @@ interface SelectedTool {
 }
 
 export default function BorrowReturn() {
+  const { user: currentUser } = useAuth();
   const [tools, setTools] = useState<Tool[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<Empl
+    
+  oyee[]>([]);
   const [selectedTools, setSelectedTools] = useState<SelectedTool[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [expectedReturnDate, setExpectedReturnDate] = useState("");
