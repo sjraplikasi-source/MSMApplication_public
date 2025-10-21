@@ -288,8 +288,7 @@ const HomePage: React.FC = () => {
     );
 };
 
-        <div className="p-6 sm:p-8 bg-gray-50 min-h-screen relative">
-            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">
                         Selamat Datang, {user?.name || user?.email || 'Pengguna'}!
