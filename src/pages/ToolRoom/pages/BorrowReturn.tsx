@@ -29,11 +29,12 @@ export default function BorrowReturn() {
   const [form, setForm] = useState({ tool_id: "", borrower_name: "", quantity: 1 });
 
   const fetchData = async () => {
-    const { data: toolsData } = await supabase.from("tools").select("id, name, stock");
-    const { data: borrowData } = await supabase
-      .from("tool_transactions")
-      .select("*, tool:tools(name)")
-      .order("borrow_date", { ascending: false });
+const { data: toolsData } = await supabase.from("tools").select("id, name, available_quantity");
+const { data: borrowData } = await supabase
+  .from("tool_loans")
+  .select("*, tool:tools(name)")
+  .order("borrowed_at", { ascending: false });
+
 
     setTools(toolsData || []);
     setRecords(borrowData || []);
