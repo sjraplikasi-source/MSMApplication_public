@@ -3,12 +3,12 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, RefreshCw } from "lucide-react";
+import { FileDown, RefreshCw, FileImage } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 
 export default function ToolRoomReports() {
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState({
     startDate: "",
@@ -30,9 +30,15 @@ export default function ToolRoomReports() {
 
       // Filter tanggal
       if (filter.startDate)
-        query = query.gte("borrowed_at", new Date(filter.startDate).toISOString());
+        query = query.gte(
+          "borrowed_at",
+          new Date(filter.startDate).toISOString()
+        );
       if (filter.endDate)
-        query = query.lte("borrowed_at", new Date(filter.endDate).toISOString());
+        query = query.lte(
+          "borrowed_at",
+          new Date(filter.endDate).toISOString()
+        );
 
       // Filter status
       if (filter.status) query = query.eq("status", filter.status);
@@ -71,6 +77,7 @@ export default function ToolRoomReports() {
         : "-",
       Status: r.status,
       Notes: r.notes || "",
+      "Return Photo": r.return_photo_url || "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -79,7 +86,7 @@ export default function ToolRoomReports() {
     XLSX.writeFile(wb, "ToolRoom_Reports.xlsx");
   };
 
-  const handleFilterChange = (e) => {
+  const handleFilterChange = (e: any) => {
     const { name, value } = e.target;
     setFilter((prev) => ({ ...prev, [name]: value }));
   };
@@ -155,6 +162,7 @@ export default function ToolRoomReports() {
               <th className="py-2 px-4 text-left">Expected Return</th>
               <th className="py-2 px-4 text-left">Returned At</th>
               <th className="py-2 px-4 text-left">Status</th>
+              <th className="py-2 px-4 text-left">Return Photo</th>
             </tr>
           </thead>
           <tbody>
@@ -194,13 +202,32 @@ export default function ToolRoomReports() {
                 >
                   {r.status}
                 </td>
+                <td className="py-2 px-4">
+                  {r.return_photo_url ? (
+                    <a
+                      href={r.return_photo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-2"
+                    >
+                      <img
+                        src={r.return_photo_url}
+                        alt="Return"
+                        className="h-10 w-10 object-cover rounded-md border border-gray-200 hover:opacity-80 transition"
+                      />
+                      <FileImage className="h-4 w-4 text-gray-400" />
+                    </a>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
               </tr>
             ))}
             {records.length === 0 && (
               <tr>
                 <td
                   className="py-3 px-4 text-center text-gray-500"
-                  colSpan={7}
+                  colSpan={8}
                 >
                   No records found
                 </td>
