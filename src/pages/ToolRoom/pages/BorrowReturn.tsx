@@ -32,11 +32,12 @@ export default function BorrowReturn() {
   const [form, setForm] = useState({ tool_id: "", borrower_name: "", quantity: 1 });
 
   const fetchData = async () => {
-const { data: toolsData } = await supabase.from("tools").select("id, name, available_quantity");
+const { data: toolsData } = await supabase.from("tools").select("id, name, available_quantity, quantity");
 const { data: borrowData } = await supabase
   .from("tool_loans")
   .select("*, tool:tools(name)")
   .order("borrowed_at", { ascending: false });
+
 
 
     setTools(toolsData || []);
@@ -53,15 +54,17 @@ const { data: borrowData } = await supabase
     if (!selectedTool) return alert("Tool tidak ditemukan!");
     if (selectedTool.stock < Number(form.quantity)) return alert("Stok tidak cukup!");
 
-    await supabase.from("tool_transactions").insert([
-      {
-        tool_id: Number(form.tool_id),
-        borrower_name: form.borrower_name,
-        quantity: Number(form.quantity),
-        borrow_date: new Date().toISOString(),
-        status: "Borrowed",
-      },
-    ]);
+await supabase.from("tool_loans").insert([
+  {
+    tool_id: form.tool_id,
+    quantity: Number(form.quantity),
+    borrowed_at: new Date().toISOString(),
+    expected_return_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // contoh: 3 hari
+    status: "borrowed",
+    notes: form.borrower_name, // sementara catat nama peminjam di kolom notes
+  },
+]);
+
 
     await supabase
       .from("tools")
@@ -77,10 +80,11 @@ const { data: borrowData } = await supabase
     const tool = tools.find((t) => t.id === record.tool_id);
     if (!tool) return;
 
-    await supabase
-      .from("tool_transactions")
-      .update({ status: "Returned", return_date: new Date().toISOString() })
-      .eq("id", record.id);
+await supabase
+  .from("tool_loans")
+  .update({ status: "returned", returned_at: new Date().toISOString() })
+  .eq("id", record.id);
+
 
     await supabase
       .from("tools")
