@@ -6,6 +6,7 @@ import BorrowReturn from "./pages/BorrowReturn";
 import Reports from "./pages/Reports";
 import ToolDetail from "./pages/ToolDetail";
 import Dashboard from "./pages/Dashboard";
+import ReturnTools from "./pages/ReturnTools";
 
 export default function ToolRoomRouter() {
   return (
@@ -16,6 +17,7 @@ export default function ToolRoomRouter() {
       <Route path="borrow" element={<BorrowReturn />} />
       <Route path="reports" element={<Reports />} />
       <Route path="detail/:id" element={<ToolDetail />} />
+      <Route path="return-tools" element={<ReturnTools />} />
 
     </Routes>
   );
