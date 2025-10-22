@@ -254,16 +254,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* --- PERUBAHAN BARU: Tombol FAB (Floating Action Button) --- */}
       {/* Tombol ini hanya muncul di mobile (lg:hidden) */}
-      <button
-        onClick={() => {
-          setIsMobileOpen(true);
-          setIsSidebarExpanded(true); // Paksa expand saat dibuka
-        }}
-        className="fixed bottom-6 left-6 z-30 lg:hidden h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg transition-transform active:scale-95"
-        title="Buka Menu"
-      >
-        <Menu className="h-6 w-6" />
-      </button>
+<div className="fixed bottom-6 right-6 z-30 lg:hidden flex flex-col items-center gap-1">
+        {/* Tombol FAB */}
+        <button
+          onClick={() => {
+            setIsMobileOpen(true);
+            setIsSidebarExpanded(true); // Paksa expand saat dibuka
+          }}
+          className="h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg transition-transform active:scale-95"
+          title="Buka Menu"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+
+        {/* Label Teks di Bawah Tombol */}
+        <span className="text-xs font-semibold text-gray-800 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full shadow-md">
+          Menu
+        </span>
+      </div>
       {/* --- Akhir Perubahan FAB --- */}
 
 
