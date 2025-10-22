@@ -120,9 +120,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     engineer: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
 
-    groupleader: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
+    groupleader: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance"],
 
-    mechanic: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom"],
+    mechanic: ["/dashboard", "/reports", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom"],
 
     planner: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
 
