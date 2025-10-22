@@ -273,7 +273,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* --- PERUBAHAN: Tombol FAB (Floating Action Button) DENGAN LABEL --- */}
       {/* Wrapper div ini sekarang memegang posisi fixed */}
-      <div className="fixed bottom-6 right-6 z-30 lg:hidden flex flex-col items-center gap-1">
+      <div className="fixed bottom-6 left-6 z-30 lg:hidden flex flex-col items-center gap-1">
         {/* Tombol FAB */}
         <button
           onClick={() => {
