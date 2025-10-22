@@ -259,7 +259,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           setIsMobileOpen(true);
           setIsSidebarExpanded(true); // Paksa expand saat dibuka
         }}
-        className="fixed bottom-6 right-6 z-30 lg:hidden h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg transition-transform active:scale-95"
+        className="fixed bottom-6 left-6 z-30 lg:hidden h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg transition-transform active:scale-95"
         title="Buka Menu"
       >
         <Menu className="h-6 w-6" />
