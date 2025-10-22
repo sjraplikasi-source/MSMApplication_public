@@ -13,8 +13,8 @@ interface LayoutProps { children: React.ReactNode; }
 type NavItem = { path: string; label: string; icon: React.ComponentType<any>; prefix?: string };
 
 // --- Komponen Grup Menu Akordion ---
-// (Tidak ada perubahan di sini, tetap sama)
-const AccordionMenuGroup = ({ title, items, isActive, onClick, currentPath, isSidebarExpanded }) => (
+// --- PERUBAHAN (Terima prop 'onLinkClick') ---
+const AccordionMenuGroup = ({ title, items, isActive, onClick, currentPath, isSidebarExpanded, onLinkClick }) => (
   <div className="mb-2">
     <button onClick={onClick} className="flex items-center justify-between w-full px-2 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-md">
       <span className={!isSidebarExpanded ? 'hidden' : ''}>{title}</span>
@@ -23,7 +23,14 @@ const AccordionMenuGroup = ({ title, items, isActive, onClick, currentPath, isSi
     {(isActive || !isSidebarExpanded) && (
       <div className={`mt-1 ${isSidebarExpanded ? 'pl-2' : ''}`}>
         {items.map(item => (
-          <Link key={item.path} to={item.path} title={item.label} className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-1 transition-colors text-sm ${currentPath.startsWith(item.prefix || item.path) ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-100"} ${!isSidebarExpanded ? 'justify-center' : ''}`}>
+          <Link
+            key={item.path}
+            to={item.path}
+            title={item.label}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-1 transition-colors text-sm ${currentPath.startsWith(item.prefix || item.path) ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-100"} ${!isSidebarExpanded ? 'justify-center' : ''}`}
+            // --- PERUBAHAN (Tambahkan onClick di sini) ---
+            onClick={onLinkClick}
+          >
             <item.icon className="h-5 w-5 flex-shrink-0" />
             <span className={!isSidebarExpanded ? 'hidden' : 'whitespace-nowrap'}>{item.label}</span>
           </Link>
@@ -148,6 +155,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleMenuClick = (menuId: string) => setActiveMenu(prev => (prev === menuId ? '' : menuId));
   const handleLogout = async () => { await logout(); navigate("/login", { replace: true }); };
 
+  // --- PERUBAHAN: Buat fungsi untuk menutup sidebar saat link diklik ---
+  const handleLinkClick = () => {
+    // Hanya tutup jika sedang dalam mode mobile (isMobileOpen = true)
+    if (isMobileOpen) {
+      setIsMobileOpen(false);
+      setIsSidebarExpanded(false);
+    }
+    // Jika di desktop, sidebar biarkan saja (karena dia mode hover)
+  };
+
   // ====== BADGE NOTIFIKASI (Realtime) ======
   const [notifCount, setNotifCount] = useState(0);
   
@@ -187,8 +204,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen bg-gray-50">
       <div
-        // --- PERUBAHAN 1 ---
-        // (Logika hover desktop tetap sama)
+        // --- PERUBAHAN: Hanya jalankan hover jika menu mobile TIDAK sedang terbuka
         onMouseEnter={() => {
           if (!isMobileOpen) {
             setIsSidebarExpanded(true);
@@ -199,7 +215,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             setIsSidebarExpanded(false);
           }
         }}
-        // --- Akhir Perubahan 1 ---
         className={`fixed z-50 top-0 left-0 h-full bg-white border-r transition-all duration-300 ease-in-out
           ${isSidebarExpanded ? 'w-64' : 'w-20'}
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -217,6 +232,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition-colors text-sm font-semibold
             ${path === '/' ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-100"}
             ${!isSidebarExpanded ? 'justify-center' : ''}`}
+            // --- PERUBAHAN: Tambahkan onClick di sini ---
+            onClick={handleLinkClick}
           >
             <Home className="h-5 w-5 flex-shrink-0" />
             <span className={!isSidebarExpanded ? 'hidden' : 'whitespace-nowrap'}>Home</span>
@@ -234,13 +251,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               onClick={() => handleMenuClick(menu.id)}
               currentPath={path}
               isSidebarExpanded={isSidebarExpanded}
+              // --- PERUBAHAN: Kirim fungsi sebagai prop ---
+              onLinkClick={handleLinkClick}
             />
           ))}
         </nav>
       </div>
 
-      {/* --- PERUBAHAN 2 (Overlay) --- */}
-      {/* (Logika overlay tetap sama) */}
+      {/* --- PERUBAHAN (Overlay) --- */}
+      {/* Overlay untuk menutup menu di mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-30 z-40 lg:hidden" 
@@ -250,11 +269,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }} 
         />
       )}
-      {/* --- Akhir Perubahan 2 --- */}
+      {/* --- Akhir Perubahan --- */}
 
-      {/* --- PERUBAHAN BARU: Tombol FAB (Floating Action Button) --- */}
-      {/* Tombol ini hanya muncul di mobile (lg:hidden) */}
-<div className="fixed bottom-6 left-6 z-30 lg:hidden flex flex-col items-center gap-1">
+      {/* --- PERUBAHAN: Tombol FAB (Floating Action Button) DENGAN LABEL --- */}
+      {/* Wrapper div ini sekarang memegang posisi fixed */}
+      <div className="fixed bottom-6 right-6 z-30 lg:hidden flex flex-col items-center gap-1">
         {/* Tombol FAB */}
         <button
           onClick={() => {
@@ -279,9 +298,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <header className="bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 py-3">
           <div className="flex items-center gap-3">
             
-            {/* --- PERUBAHAN 3 --- */}
-            {/* Tombol hamburger di header DIHAPUS */}
-            {/* --- Akhir Perubahan 3 --- */}
+            {/* --- PERUBAHAN: Tombol hamburger di header DIHAPUS --- */}
 
             <h2 className="text-lg md:text-xl font-semibold text-gray-800">Maintenance & SM</h2>
           </div>
