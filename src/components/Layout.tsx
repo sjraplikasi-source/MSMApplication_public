@@ -118,17 +118,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     supplymanagement: ["/dashboard", "/supply/backlog"],
 
-    engineer: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
+    engineer: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance"],
 
     groupleader: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance"],
 
     mechanic: ["/dashboard", "/reports", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom"],
 
-    planner: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
+    planner: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
 
-    superintendent: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
+    superintendent: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
 
-    supervisor: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog"],
+    supervisor: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
 
   };
 
