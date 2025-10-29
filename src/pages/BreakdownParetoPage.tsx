@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { 
-  ComposedChart, // <-- DIUBAH: Menggunakan ComposedChart
+  ComposedChart, 
   Bar, 
   XAxis, 
   YAxis, 
@@ -13,43 +13,40 @@ import {
   ResponsiveContainer, 
   ReferenceLine 
 } from 'recharts';
-import { Tabs, Tab } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from '@/lib/supabase';
+// --- PERBAIKAN 1: Import komponen Tab yang benar (shadcn/ui) ---
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/src/components/ui/tabs"; // Path diubah ke @/src/
+// ---
+import { Card, CardContent } from "@/src/components/ui/card"; // Path diubah ke @/src/
+import { supabase } from '@/src/lib/supabase'; // Path diubah ke @/src/
 import { format, startOfMonth } from 'date-fns';
 
-// --- Tipe Data ---
+// --- Tipe Data (Tidak berubah) ---
 interface BreakdownData {
   label: string;
   duration: number;
   cumulativePercent: number;
 }
 
-// --- Komponen Chart ---
+// --- Komponen Chart (Tidak berubah) ---
 const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) => {
-  
-  // --- LANGKAH DEBUGGING PENTING ---
-  // Cek data yang diterima komponen di console browser (Tekan F12)
-  console.log("Data untuk ParetoChart:", data); 
-  // ---
-
   return (
     <Card className="p-4">
       <CardContent>
         <h3 className="text-lg font-semibold mb-4">{title}</h3>
         <ResponsiveContainer width="100%" height={350}>
-          {/* --- DIUBAH: Menggunakan ComposedChart --- */}
           <ComposedChart data={data} syncId="paretoChart">
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" angle={-30} textAnchor="end" height={80} interval={0} tick={{ fontSize: 8 }}/>
-            
-            {/* Y-Axis Kiri untuk Durasi (Bar) */}
             <YAxis
               yAxisId="left"
               orientation="left"
               label={{ value: 'Duration (hours)', angle: -90, position: 'insideLeft' }}
             />
-            {/* Y-Axis Kanan untuk Persentase (Line) */}
             <YAxis
               yAxisId="right"
               type="number"
@@ -59,9 +56,7 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
               allowDataOverflow
               label={{ value: 'Cumulative %', angle: 90, position: 'insideRight' }}
             />
-            
             <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" label={{ value: '80% Threshold', position: 'left', fill: 'green' }} />
-            
             <Tooltip
               formatter={(value: number, name: string) => {
                 if (name === "Cumulative %") return [`${value.toFixed(2)}%`, name];
@@ -70,13 +65,11 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
               }}
             />
             <Legend />
-            
-            {/* Definisikan Bar dan Line sebagai anak dari ComposedChart */}
             <Bar yAxisId="left" dataKey="duration" fill="#1E90FF" name="Duration (hours)" />
             <Line
               yAxisId="right"
               type="monotone"
-              dataKey="cumulativePercent" // Pastikan 'cumulativePercent' ada di data
+              dataKey="cumulativePercent"
               stroke="#FF0000"
               name="Cumulative %"
               strokeWidth={3}
@@ -85,14 +78,13 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
               isAnimationActive={false}
             />
           </ComposedChart>
-          {/* --- AKHIR PERUBAHAN --- */}
         </ResponsiveContainer>
       </CardContent>
     </Card>
   );
 };
 
-// --- Tentukan tanggal default di luar komponen ---
+// --- Tanggal Default (Tidak berubah) ---
 const today = new Date();
 const defaultStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
 const defaultEndDate = format(today, 'yyyy-MM-dd');
@@ -106,12 +98,12 @@ export default function BreakdownParetoPage() {
   const [componentData, setComponentData] = useState<BreakdownData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- useEffect (Tidak berubah) ---
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       
       if (new Date(endDate) < new Date(startDate)) {
-        console.error("End date cannot be before start date.");
         setLoading(false);
         return;
       }
@@ -133,7 +125,6 @@ export default function BreakdownParetoPage() {
         return;
       }
 
-      // Fungsi kalkulasi Pareto
       const groupAndCalculate = (key: 'area' | 'sub_component') => {
         const map: Record<string, number> = {};
         data.forEach((d) => {
@@ -171,7 +162,7 @@ export default function BreakdownParetoPage() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Kontrol Tanggal */}
+      {/* Kontrol Tanggal (Tidak berubah) */}
       <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-lg shadow-sm border">
         <div className="flex flex-col">
           <label htmlFor="start-date" className="text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -196,21 +187,31 @@ export default function BreakdownParetoPage() {
         </div>
       </div>
 
-      {/* Tampilan Tab Chart */}
+      {/* --- PERBAIKAN 2: Gunakan struktur Tab shadcn/ui --- */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <p className="text-gray-500">Memuat data Pareto...</p>
         </div>
       ) : (
-        <Tabs defaultValue="area">
-          <Tab value="area" label="By Area">
+        <Tabs defaultValue="area" className="w-full">
+          {/* Ini adalah tombol Tab-nya */}
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="area">By Area</TabsTrigger>
+            <TabsTrigger value="component">By Sub Component</TabsTrigger>
+          </TabsList>
+          
+          {/* Ini adalah konten untuk tiap Tab */}
+          <TabsContent value="area">
             <ParetoChart data={areaData} title={`Pareto Breakdown by Area (${startDate} - ${endDate})`} />
-          </Tab>
-          <Tab value="component" label="By Sub Component">
+          </TabsContent>
+          <TabsContent value="component">
             <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
-          </Tab>
+          </TabsContent>
         </Tabs>
       )}
+      {/* --- AKHIR PERBAIKAN --- */}
     </div>
   );
 }
+
+
