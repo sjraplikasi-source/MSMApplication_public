@@ -3,11 +3,22 @@
 // =============================
 
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { 
+  ComposedChart, // <-- DIUBAH
+  Bar, 
+  Line, // <-- DITAMBAH
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  ReferenceLine // <-- DITAMBAH
+} from 'recharts';
 import { Filter, Wrench, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Path alias diganti ke relative path
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { format, subDays, startOfMonth } from 'date-fns'; // 'endOfMonth' sudah tidak dipakai di sini
+import { format, subDays, startOfMonth } from 'date-fns';
 
 // --- Tipe Data dari Supabase ---
 type KpiData = {
@@ -16,7 +27,12 @@ type KpiData = {
   avgDowntime: string;
   menungguValidasi: number;
 };
-type ParetoData = { name: string; downtime: number };
+// --- DIUBAH: Ditambahkan cumulativePercent ---
+type ParetoData = { 
+  name: string; 
+  downtime: number; 
+  cumulativePercent: number; 
+};
 type MechanicData = { name: string; closed_reports: number };
 type ReportData = {
   id: string;
@@ -24,11 +40,10 @@ type ReportData = {
   problem_description: string;
   status: string;
   equipment: { name: string } | null;
-  // Menambahkan tipe data yang diperlukan untuk relasi
   problems: { name: string } | null;
   repair_reports_manpower: { manpower: { name: string } | null }[];
-  created_at: string; // untuk sorting
-  duration: number | null; // untuk kalkulasi
+  created_at: string;
+  duration: number | null;
 };
 
 // --- Komponen UI (tidak berubah) ---
@@ -73,12 +88,14 @@ export default function App() {
 
   // State untuk data dari Supabase
   const [kpiData, setKpiData] = useState<KpiData>({ laporanMasuk: 0, laporanDitutup: 0, avgDowntime: '0 Jam', menungguValidasi: 0 });
+  
+  // --- Tipenya diubah untuk menampung cumulativePercent ---
   const [paretoEquipment, setParetoEquipment] = useState<ParetoData[]>([]);
   const [paretoProblem, setParetoProblem] = useState<ParetoData[]>([]);
+  
   const [mechanicLeaderboard, setMechanicLeaderboard] = useState<MechanicData[]>([]);
-  const [recentReports, setRecentReports] = useState<ReportData[]>([]); // Tipenya disesuaikan
+  const [recentReports, setRecentReports] = useState<ReportData[]>([]);
 
-  // --- HOOK EFFECT DENGAN PERBAIKAN ---
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -91,29 +108,24 @@ export default function App() {
         case 'last_30_days': startDate = format(subDays(now, 30), 'yyyy-MM-dd'); break;
       }
       
-      // --- PERBAIKAN 1: 'endDate' diatur ke hari ini agar filter 'last_x_days' akurat ---
       const endDate = format(now, 'yyyy-MM-dd');
 
-      // --- PERBAIKAN 2: Query khusus untuk 'Menunggu Validasi' (tidak pakai filter tanggal) ---
-      // Kita hanya butuh jumlahnya (count), jadi pakai 'head: true' agar lebih cepat
+      // Query validasi (tidak berubah)
       const { count: validationCount, error: validationError } = await supabase
         .from('repair_reports')
-        .select('*', { count: 'exact', head: true }) // Hanya ambil jumlahnya
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'submitted');
 
       if (validationError) {
-        // Tetap lanjutkan, jangan hentikan semua proses dashboard jika ini gagal
         console.error("Gagal mengambil data validasi:", validationError);
       }
-      // --- Akhir Perbaikan 2 ---
 
-
-      // Fetch semua data laporan dalam rentang waktu (untuk KPI lain & chart)
+      // Query laporan utama (tidak berubah)
       const { data: reports, error } = await supabase
         .from('repair_reports')
         .select(`*, equipment:equipment_id(name), problems:problems_id(name), repair_reports_manpower(manpower(name))`)
         .gte('created_at', startDate)
-        .lte('created_at', endDate); // <-- 'endDate' yang sudah diperbaiki
+        .lte('created_at', endDate);
 
       if (error) {
         console.error("Gagal mengambil data dashboard:", error);
@@ -121,35 +133,57 @@ export default function App() {
         return;
       }
 
-      // 1. Proses KPI
+      // 1. Proses KPI (tidak berubah)
       const laporanMasuk = reports.length;
       const laporanDitutup = reports.filter(r => r.status === 'approved').length;
       const totalDowntime = reports.reduce((sum, r) => sum + (r.duration || 0), 0);
       const avgDowntime = laporanMasuk > 0 ? (totalDowntime / laporanMasuk).toFixed(1) + ' Jam' : '0 Jam';
-
-      // --- PERBAIKAN 3: Gunakan 'validationCount' dari query khusus ---
       setKpiData({
         laporanMasuk,
         laporanDitutup,
         avgDowntime,
-        menungguValidasi: validationCount || 0 // <-- Menggunakan hasil query terpisah
+        menungguValidasi: validationCount || 0
       });
-      // --- Akhir Perbaikan 3 ---
 
+      // --- PERUBAHAN LOGIKA PARETO DI SINI ---
+      // 2. Proses Pareto (DIPERBARUI)
+      
+      // Helper function untuk kalkulasi Pareto
+      const calculatePareto = (map: Map<string, number>): ParetoData[] => {
+          const sorted = Array.from(map.entries())
+              .map(([name, downtime]) => ({ name, downtime: parseFloat(downtime.toFixed(2)) }))
+              .sort((a, b) => b.downtime - a.downtime);
 
-      // 2. Proses Pareto
+          let total = sorted.reduce((sum, d) => sum + d.downtime, 0);
+          if (total === 0) total = 1; // Hindari pembagian dengan nol
+
+          let cumulative = 0;
+          return sorted.map((item) => {
+              cumulative += item.downtime;
+              return {
+                  ...item,
+                  cumulativePercent: parseFloat(((cumulative / total) * 100).toFixed(2))
+              };
+          });
+      };
+
       const equipmentMap = new Map<string, number>();
       const problemMap = new Map<string, number>();
       reports.forEach(r => {
         const eqName = r.equipment?.name || 'Unknown Equipment';
         const probName = r.problems?.name || 'Uncategorized';
-        equipmentMap.set(eqName, (equipmentMap.get(eqName) || 0) + (r.duration || 0));
-        problemMap.set(probName, (problemMap.get(probName) || 0) + (r.duration || 0));
+        const dur = r.duration || 0;
+        equipmentMap.set(eqName, (equipmentMap.get(eqName) || 0) + dur);
+        problemMap.set(probName, (problemMap.get(probName) || 0) + dur);
       });
-      setParetoEquipment(Array.from(equipmentMap.entries()).map(([name, downtime]) => ({ name, downtime: parseFloat(downtime.toFixed(2)) })).sort((a, b) => b.downtime - a.downtime));
-      setParetoProblem(Array.from(problemMap.entries()).map(([name, downtime]) => ({ name, downtime: parseFloat(downtime.toFixed(2)) })).sort((a, b) => b.downtime - a.downtime));
 
-      // 3. Proses Leaderboard Mekanik
+      // Gunakan helper function untuk menghitung data Pareto
+      setParetoEquipment(calculatePareto(equipmentMap));
+      setParetoProblem(calculatePareto(problemMap));
+      // --- AKHIR PERUBAHAN LOGIKA PARETO ---
+
+
+      // 3. Proses Leaderboard Mekanik (tidak berubah)
       const mechanicMap = new Map<string, number>();
       reports.filter(r => r.status === 'approved').forEach(r => {
         r.repair_reports_manpower.forEach(m => {
@@ -161,28 +195,62 @@ export default function App() {
       });
       setMechanicLeaderboard(Array.from(mechanicMap.entries()).map(([name, closed_reports]) => ({ name, closed_reports })).sort((a, b) => b.closed_reports - a.closed_reports).slice(0, 5));
 
-      // 4. Laporan Terbaru
+      // 4. Laporan Terbaru (tidak berubah)
       setRecentReports(reports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5));
 
       setLoading(false);
     };
     fetchData();
   }, [dateRange]);
-  // --- AKHIR DARI EFFECT ---
 
-
-  const ParetoChart = ({ data }) => (
+  // --- KOMPONEN PARETO CHART DIPERBARUI ---
+  const ParetoChart = ({ data }: { data: ParetoData[] }) => (
     <ResponsiveContainer>
-      <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
+      <ComposedChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} fontSize={12} />
-        <YAxis label={{ value: 'Total Downtime (Jam)', angle: -90, position: 'insideLeft' }} fontSize={12} />
-        <Tooltip />
+        {/* Y-Axis Kiri (Downtime) */}
+        <YAxis
+          yAxisId="left"
+          orientation="left"
+          label={{ value: 'Total Downtime (Jam)', angle: -90, position: 'insideLeft' }}
+          fontSize={12}
+        />
+        {/* Y-Axis Kanan (Persentase) */}
+        <YAxis
+          yAxisId="right"
+          orientation="right"
+          domain={[0, 100]}
+          ticks={[0, 20, 40, 60, 80, 100]}
+          label={{ value: 'Cumulative %', angle: 90, position: 'insideRight' }}
+          fontSize={12}
+        />
+        <Tooltip
+          formatter={(value: number, name: string) => {
+            if (name === "Cumulative %") return [`${value.toFixed(2)}%`, name];
+            if (name === "Downtime (Jam)") return [`${value.toFixed(2)} hours`, name];
+            return [value, name];
+          }}
+        />
         <Legend />
-        <Bar dataKey="downtime" fill="#ef4444" name="Downtime (Jam)" />
-      </BarChart>
+        <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" />
+        {/* Bar untuk Downtime */}
+        <Bar yAxisId="left" dataKey="downtime" fill="#ef4444" name="Downtime (Jam)" />
+        {/* Line untuk Kumulatif */}
+        <Line
+          yAxisId="right"
+          type="monotone"
+          dataKey="cumulativePercent"
+          stroke="#ff7300" // Warna oranye
+          name="Cumulative %"
+          strokeWidth={3}
+          dot={false}
+        />
+      </ComposedChart>
     </ResponsiveContainer>
   );
+  // --- AKHIR PERUBAHAN PARETO CHART ---
+
 
   return (
     <div className="bg-gray-50 p-4 sm:p-6 min-h-screen font-sans">
@@ -205,6 +273,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* KPI Cards (tidak berubah) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard title="Laporan Masuk" value={kpiData.laporanMasuk} icon={Wrench} color="bg-blue-500" onClick={() => navigate('/reports')} />
         <KpiCard title="Laporan Ditutup" value={kpiData.laporanDitutup} icon={CheckCircle} color="bg-green-500" onClick={() => navigate('/reports?status=approved')} />
@@ -212,6 +281,7 @@ export default function App() {
         <KpiCard title="Menunggu Validasi" value={kpiData.menungguValidasi} icon={AlertTriangle} color="bg-red-500" onClick={() => navigate('/validasi')} />
       </div>
 
+      {/* Pareto Chart Container (tidak berubah, tapi akan me-render chart baru) */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6">
         <div className="flex border-b mb-4">
           <button onClick={() => setParetoTab('equipment')} className={`px-4 py-2 text-sm font-medium ${paretoTab === 'equipment' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -226,6 +296,7 @@ export default function App() {
         </ChartContainer>
       </div>
 
+      {/* Grid Bawah (tidak berubah) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
           <h3 className="text-md font-semibold text-gray-700 mb-4">Leaderboard Mekanik (Bulan Ini)</h3>
@@ -263,4 +334,3 @@ export default function App() {
     </div>
   );
 }
-
