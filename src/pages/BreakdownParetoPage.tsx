@@ -1,10 +1,21 @@
 // src/pages/BreakdownParetoPage.tsx
 
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Tabs, Tab } from "@/components/ui/tabs"; // Menggunakan alias path @/
-import { Card, CardContent } from "@/components/ui/card"; // Menggunakan alias path @/
-import { supabase } from '@/lib/supabase'; // Menggunakan alias path @/
+import { 
+  ComposedChart, // <-- DIUBAH: Menggunakan ComposedChart
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  CartesianGrid, 
+  Line, 
+  Legend, 
+  ResponsiveContainer, 
+  ReferenceLine 
+} from 'recharts';
+import { Tabs, Tab } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from '@/lib/supabase';
 import { format, startOfMonth } from 'date-fns';
 
 // --- Tipe Data ---
@@ -16,15 +27,22 @@ interface BreakdownData {
 
 // --- Komponen Chart ---
 const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) => {
+  
+  // --- LANGKAH DEBUGGING PENTING ---
+  // Cek data yang diterima komponen di console browser (Tekan F12)
+  console.log("Data untuk ParetoChart:", data); 
+  // ---
+
   return (
     <Card className="p-4">
       <CardContent>
         <h3 className="text-lg font-semibold mb-4">{title}</h3>
         <ResponsiveContainer width="100%" height={350}>
-          {/* Menggunakan BarChart untuk menggabungkan Bar dan Line */}
-          <BarChart data={data} syncId="paretoChart">
+          {/* --- DIUBAH: Menggunakan ComposedChart --- */}
+          <ComposedChart data={data} syncId="paretoChart">
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" angle={-30} textAnchor="end" height={80} interval={0} tick={{ fontSize: 8 }}/>
+            
             {/* Y-Axis Kiri untuk Durasi (Bar) */}
             <YAxis
               yAxisId="left"
@@ -36,41 +54,38 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
               yAxisId="right"
               type="number"
               orientation="right"
-              domain={[0, 100]} // Skala 0-100 untuk persentase
+              domain={[0, 100]}
               ticks={[0, 20, 40, 60, 80, 100]}
               allowDataOverflow
               label={{ value: 'Cumulative %', angle: 90, position: 'insideRight' }}
             />
-            {/* Garis referensi 80% */}
+            
             <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" label={{ value: '80% Threshold', position: 'left', fill: 'green' }} />
+            
             <Tooltip
               formatter={(value: number, name: string) => {
-                // Custom formatter untuk tooltip
-                if (name === "Cumulative %") {
-                  return [`${value.toFixed(2)}%`, name]; // Tambah '%'
-                }
-                if (name === "Duration (hours)") {
-                  return [`${value.toFixed(2)} hours`, name]; // Tambah 'hours'
-                }
+                if (name === "Cumulative %") return [`${value.toFixed(2)}%`, name];
+                if (name === "Duration (hours)") return [`${value.toFixed(2)} hours`, name];
                 return [value, name];
               }}
             />
             <Legend />
-            {/* Bar Chart untuk Durasi */}
+            
+            {/* Definisikan Bar dan Line sebagai anak dari ComposedChart */}
             <Bar yAxisId="left" dataKey="duration" fill="#1E90FF" name="Duration (hours)" />
-            {/* Line Chart untuk Persentase Kumulatif */}
             <Line
               yAxisId="right"
-              type="monotone" // Bentuk garis
-              dataKey="cumulativePercent" // Data yang digunakan
-              stroke="#FF0000" // Warna garis
-              name="Cumulative %" // Nama di legend
+              type="monotone"
+              dataKey="cumulativePercent" // Pastikan 'cumulativePercent' ada di data
+              stroke="#FF0000"
+              name="Cumulative %"
               strokeWidth={3}
               dot={{ r: 4 }}
               activeDot={{ r: 7 }}
               isAnimationActive={false}
             />
-          </BarChart>
+          </ComposedChart>
+          {/* --- AKHIR PERUBAHAN --- */}
         </ResponsiveContainer>
       </CardContent>
     </Card>
@@ -79,25 +94,22 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
 
 // --- Tentukan tanggal default di luar komponen ---
 const today = new Date();
-// Format 'yyyy-MM-dd' penting agar sesuai dengan <input type="date">
 const defaultStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
 const defaultEndDate = format(today, 'yyyy-MM-dd');
 
 // --- Komponen Halaman Utama ---
 export default function BreakdownParetoPage() {
-  // Gunakan tanggal default yang dinamis
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
   
   const [areaData, setAreaData] = useState<BreakdownData[]>([]);
   const [componentData, setComponentData] = useState<BreakdownData[]>([]);
-  const [loading, setLoading] = useState(true); // Tambahkan state loading
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true); // Mulai loading
+      setLoading(true);
       
-      // Validasi tanggal
       if (new Date(endDate) < new Date(startDate)) {
         console.error("End date cannot be before start date.");
         setLoading(false);
@@ -132,18 +144,18 @@ export default function BreakdownParetoPage() {
         });
 
         const sorted = Object.entries(map)
-          .sort((a, b) => b[1] - a[1]) // Urutkan dari tertinggi
+          .sort((a, b) => b[1] - a[1])
           .map(([label, duration]) => ({ label, duration: parseFloat(duration.toFixed(2)) }));
 
         let total = sorted.reduce((sum, d) => sum + d.duration, 0);
-        if (total === 0) total = 1; // Hindari pembagian dengan nol
+        if (total === 0) total = 1;
 
         let cumulative = 0;
         const calculated = sorted.map((item) => {
           cumulative += item.duration;
           return {
             ...item,
-            cumulativePercent: parseFloat(((cumulative / total) * 100).toFixed(2)) // Hitung kumulatif %
+            cumulativePercent: parseFloat(((cumulative / total) * 100).toFixed(2))
           };
         });
         return calculated;
@@ -151,11 +163,11 @@ export default function BreakdownParetoPage() {
 
       setAreaData(groupAndCalculate('area'));
       setComponentData(groupAndCalculate('sub_component'));
-      setLoading(false); // Selesai loading
+      setLoading(false);
     };
 
     fetchData();
-  }, [startDate, endDate]); // Dependency array
+  }, [startDate, endDate]);
 
   return (
     <div className="p-4 space-y-4">
@@ -178,7 +190,7 @@ export default function BreakdownParetoPage() {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            min={startDate} // Mencegah tanggal akhir sebelum tanggal mulai
+            min={startDate}
             className="border border-gray-300 px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
