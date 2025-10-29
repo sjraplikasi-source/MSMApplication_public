@@ -1,17 +1,22 @@
+// src/pages/BreakdownParetoPage.tsx
+
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Tabs, Tab } from "../components/ui/tabs";
-import { Card, CardContent } from "../components/ui/card";
-import { supabase } from '@/lib/supabase';
+import { Tabs, Tab } from "@/components/ui/tabs"; // Asumsi path ini benar -> Diubah ke alias
+import { Card, CardContent } from "@/components/ui/card"; // Asumsi path ini benar -> Diubah ke alias
+import { supabase } from '@/lib/supabase'; // <-- PERBAIKAN 1: Path diubah ke alias
+import { format, startOfMonth } from 'date-fns'; // <-- PERBAIKAN 2: Import date-fns
 
+// --- Tipe Data ---
 interface BreakdownData {
   label: string;
   duration: number;
   cumulativePercent: number;
 }
 
+// --- Komponen Chart ---
 const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) => {
-  console.log('Pareto Data:', data);
+  // console.log('Pareto Data:', data); // Dibiarkan jika masih perlu debugging
   return (
     <Card className="p-4">
       <CardContent>
@@ -27,7 +32,7 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
             />
             <YAxis
               yAxisId="right"
-              type="number"$1
+              type="number" // <-- PERBAIKAN 3: Typo '$1' dihapus
               orientation="right"
               domain={[0, 100]}
               ticks={[0, 20, 40, 60, 80, 100]}
@@ -37,7 +42,7 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
             <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" label={{ value: '80% Threshold', position: 'left', fill: 'green' }} />
             <Tooltip />
             <Legend />
-                        <Bar yAxisId="left" dataKey="duration" fill="#1E90FF" name="Duration (hours)" />
+            <Bar yAxisId="left" dataKey="duration" fill="#1E90FF" name="Duration (hours)" />
             <Line
               yAxisId="right"
               type="monotone"
@@ -49,7 +54,7 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
               activeDot={{ r: 7 }}
               animationDuration={800}
               strokeDasharray="0"
-              isAnimationActive={false}
+              isAnimationActive={false} // Set ke false agar garis tidak re-render terus
             />
           </BarChart>
         </ResponsiveContainer>
@@ -58,14 +63,35 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
   );
 };
 
+// --- PERBAIKAN 4: Tentukan tanggal default di luar komponen ---
+const today = new Date();
+// Format 'yyyy-MM-dd' penting agar sesuai dengan <input type="date">
+const defaultStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
+const defaultEndDate = format(today, 'yyyy-MM-dd');
+
+// --- Komponen Halaman Utama ---
 export default function BreakdownParetoPage() {
-  const [startDate, setStartDate] = useState('2025-06-01');
-  const [endDate, setEndDate] = useState('2025-06-14');
+  // --- PERBAIKAN 5: Gunakan tanggal default yang dinamis ---
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
+  // ---
+  
   const [areaData, setAreaData] = useState<BreakdownData[]>([]);
   const [componentData, setComponentData] = useState<BreakdownData[]>([]);
+  const [loading, setLoading] = useState(true); // Tambahkan state loading
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true); // Mulai loading
+      
+      // Validasi tanggal untuk memastikan endDate tidak sebelum startDate
+      if (new Date(endDate) < new Date(startDate)) {
+        console.error("End date cannot be before start date.");
+        setLoading(false);
+        // Mungkin tampilkan notifikasi error ke user di sini
+        return;
+      }
+
       const { data, error } = await supabase
         .from('repair_reports')
         .select('area(name), sub_component(name), duration, start_date')
@@ -74,14 +100,20 @@ export default function BreakdownParetoPage() {
 
       if (error) {
         console.error('Error fetching data:', error);
+        setLoading(false);
         return;
       }
 
-      if (!data) return;
+      if (!data) {
+        setLoading(false);
+        return;
+      }
 
+      // Fungsi kalkulasi Pareto (tidak berubah)
       const groupAndCalculate = (key: 'area' | 'sub_component') => {
         const map: Record<string, number> = {};
         data.forEach((d) => {
+          // @ts-ignore
           const label = d[key]?.name || 'Unknown';
           const dur = Number(d.duration);
           map[label] = (map[label] || 0) + (isNaN(dur) ? 0 : dur);
@@ -89,62 +121,74 @@ export default function BreakdownParetoPage() {
 
         const sorted = Object.entries(map)
           .sort((a, b) => b[1] - a[1])
-          .map(([label, duration]) => ({ label, duration }));
+          .map(([label, duration]) => ({ label, duration: parseFloat(duration.toFixed(2)) })); // Pastikan 2 desimal
 
         let total = sorted.reduce((sum, d) => sum + d.duration, 0);
-        if (total === 0) total = 1;
+        if (total === 0) total = 1; // Hindari pembagian dengan nol
 
         let cumulative = 0;
         const calculated = sorted.map((item) => {
           cumulative += item.duration;
           return {
-            label: item.label,
-            duration: item.duration,
+            ...item,
             cumulativePercent: parseFloat(((cumulative / total) * 100).toFixed(2))
           };
         });
-        console.log('CALCULATED', key, calculated);
+        // console.log('CALCULATED', key, calculated);
         return calculated;
       };
 
       setAreaData(groupAndCalculate('area'));
       setComponentData(groupAndCalculate('sub_component'));
+      setLoading(false); // Selesai loading
     };
 
     fetchData();
-  }, [startDate, endDate]);
+  }, [startDate, endDate]); // Dependency array sudah benar
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center gap-4">
+      {/* Kontrol Tanggal */}
+      <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-lg shadow-sm border">
         <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-700">Start Date</label>
+          <label htmlFor="start-date" className="text-sm font-medium text-gray-700 mb-1">Start Date</label>
           <input
+            id="start-date"
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="border px-3 py-1 rounded"
+            className="border border-gray-300 px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-700">End Date</label>
+          <label htmlFor="end-date" className="text-sm font-medium text-gray-700 mb-1">End Date</label>
           <input
+            id="end-date"
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="border px-3 py-1 rounded"
+            min={startDate} // Mencegah tanggal akhir sebelum tanggal mulai
+            className="border border-gray-300 px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      <Tabs defaultValue="area">
-        <Tab value="area" label="By Area">
-          <ParetoChart data={areaData} title={`Pareto Breakdown by Area (${startDate} - ${endDate})`} />
-        </Tab>
-        <Tab value="component" label="By Sub Component">
-          <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
-        </Tab>
-      </Tabs>
+      {/* Tampilan Tab Chart */}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <p className="text-gray-500">Memuat data Pareto...</p>
+        </div>
+      ) : (
+        <Tabs defaultValue="area">
+          <Tab value="area" label="By Area">
+            <ParetoChart data={areaData} title={`Pareto Breakdown by Area (${startDate} - ${endDate})`} />
+          </Tab>
+          <Tab value="component" label="By Sub Component">
+            <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
+          </Tab>
+        </Tabs>
+      )}
     </div>
   );
 }
+
