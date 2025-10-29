@@ -1,9 +1,7 @@
+// ==============================================
 // src/pages/MineMaintenance/WeeklyCheck.tsx
-
-// ================================
-// src/pages/MineMaintenance/WeeklyCheck.tsx
-// Versi UI/UX baru — siap tempel
-// ================================
+// Versi Final dengan Sorting Desc & Filter Bulan
+// ==============================================
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { format, getISOWeek } from 'date-fns';
@@ -11,10 +9,10 @@ import WeeklyCheckForm from '@/components/mine/modals/WeeklyCheckForm';
 import EditActualDateModal from '@/components/mine/modals/EditActualDateModal';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { Loader2, Search, Download, PlusCircle } from 'lucide-react';
+import { Loader2, Search, Download, PlusCircle, Calendar } from 'lucide-react';
 
 // ================================
-// Helper Components
+// Badge Status
 // ================================
 const StatusBadge = ({ status }: { status: string }) => {
   const color =
@@ -25,9 +23,7 @@ const StatusBadge = ({ status }: { status: string }) => {
       : 'bg-yellow-100 text-yellow-700';
   const label = status.replace('✅', '').replace('❌', '').replace('🕒', '').trim();
   return (
-    <span
-      className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${color}`}
-    >
+    <span className={`px-2 py-1 rounded text-xs font-semibold ${color}`}>
       {label}
     </span>
   );
@@ -47,6 +43,7 @@ export default function WeeklyCheck() {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterMonth, setFilterMonth] = useState(''); // 🌟 new filter bulan
 
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
@@ -71,7 +68,7 @@ export default function WeeklyCheck() {
         )
       `
       )
-      .order('plan_date', { ascending: true });
+      .order('plan_date', { ascending: false }); // 🔄 Urutan terbaru ke terlama
 
     if (error) {
       console.error('Fetch error:', error.message);
@@ -116,17 +113,23 @@ export default function WeeklyCheck() {
   };
 
   // ================================
-  // Filter + Grouping Logic
+  // Filter & Grouping Logic
   // ================================
   const filtered = data.filter((d) => {
     const matchName = d.equipment_name.toLowerCase().includes(search.toLowerCase());
     const status = getStatus(d.plan_date, d.actual_date);
+
     const matchStatus =
       filterStatus === '' ||
       (filterStatus === 'done' && status.includes('Done')) ||
       (filterStatus === 'pending' && status.includes('Pending')) ||
       (filterStatus === 'missed' && status.includes('Missed'));
-    return matchName && matchStatus;
+
+    const matchMonth =
+      filterMonth === '' ||
+      new Date(d.plan_date).getMonth() === parseInt(filterMonth);
+
+    return matchName && matchStatus && matchMonth;
   });
 
   const grouped = filtered.reduce((acc: any, item: any) => {
@@ -136,11 +139,18 @@ export default function WeeklyCheck() {
     return acc;
   }, {});
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginatedWeeks = Object.keys(grouped).slice(
-    (page - 1) * 3,
-    (page - 1) * 3 + 3
-  ); // tampilkan 3 minggu per halaman
+  const totalPages = Math.ceil(Object.keys(grouped).length / 3);
+  const paginatedWeeks = Object.keys(grouped)
+    .slice((page - 1) * 3, (page - 1) * 3 + 3)
+    .sort((a, b) => parseInt(b) - parseInt(a)); // urutan minggu terbaru dulu
+
+  // ================================
+  // Month List
+  // ================================
+  const monthList = [
+    'Januari','Februari','Maret','April','Mei','Juni',
+    'Juli','Agustus','September','Oktober','November','Desember'
+  ];
 
   return (
     <div className="p-6">
@@ -172,7 +182,7 @@ export default function WeeklyCheck() {
 
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4 items-center justify-between">
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
             <input
@@ -183,6 +193,7 @@ export default function WeeklyCheck() {
               className="border pl-8 pr-3 py-2 text-sm rounded-md w-64"
             />
           </div>
+
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -193,7 +204,25 @@ export default function WeeklyCheck() {
             <option value="pending">🕒 Pending</option>
             <option value="missed">❌ Missed</option>
           </select>
+
+          {/* 🌟 Filter Bulan */}
+          <div className="relative">
+            <Calendar className="absolute left-2 top-2.5 text-gray-400" size={16} />
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="border rounded-md pl-8 pr-3 py-2 text-sm w-44"
+            >
+              <option value="">Semua Bulan</option>
+              {monthList.map((month, idx) => (
+                <option key={idx} value={idx.toString()}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <p className="text-sm text-gray-500">
           Total Data: <span className="font-semibold">{filtered.length}</span>
         </p>
@@ -231,10 +260,7 @@ export default function WeeklyCheck() {
               </thead>
               <tbody>
                 {grouped[week].map((check: any) => (
-                  <tr
-                    key={check.id}
-                    className="border-b hover:bg-gray-50 transition-colors"
-                  >
+                  <tr key={check.id} className="border-b hover:bg-gray-50">
                     <td className="p-2">{check.equipment_name}</td>
                     <td className="p-2">{format(new Date(check.plan_date), 'dd/MM/yyyy')}</td>
                     <td className="p-2">
@@ -253,9 +279,7 @@ export default function WeeklyCheck() {
                     </td>
                     <td className="p-2">{check.interval_days ?? '-'}</td>
                     <td className="p-2">
-                      <StatusBadge
-                        status={getStatus(check.plan_date, check.actual_date)}
-                      />
+                      <StatusBadge status={getStatus(check.plan_date, check.actual_date)} />
                     </td>
                   </tr>
                 ))}
@@ -301,7 +325,6 @@ export default function WeeklyCheck() {
           onSuccess={() => setRefresh(!refresh)}
         />
       )}
-
       {editId && (
         <EditActualDateModal
           id={editId}
