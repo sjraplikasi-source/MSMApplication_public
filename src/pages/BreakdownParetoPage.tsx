@@ -13,16 +13,16 @@ import {
   ResponsiveContainer, 
   ReferenceLine 
 } from 'recharts';
-// --- PERBAIKAN 1: Import komponen Tab yang benar (shadcn/ui) ---
+// --- PERBAIKAN: Menambahkan 'src/' ke alias path '@/' ---
 import { 
   Tabs, 
   TabsContent, 
   TabsList, 
   TabsTrigger 
 } from "@/src/components/ui/tabs"; // Path diubah ke @/src/
-// ---
 import { Card, CardContent } from "@/src/components/ui/card"; // Path diubah ke @/src/
 import { supabase } from '@/src/lib/supabase'; // Path diubah ke @/src/
+// ---
 import { format, startOfMonth } from 'date-fns';
 
 // --- Tipe Data (Tidak berubah) ---
@@ -187,7 +187,7 @@ export default function BreakdownParetoPage() {
         </div>
       </div>
 
-      {/* --- PERBAIKAN 2: Gunakan struktur Tab shadcn/ui --- */}
+      {/* Struktur Tab shadcn/ui (Tidak berubah) */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <p className="text-gray-500">Memuat data Pareto...</p>
@@ -209,9 +209,7 @@ export default function BreakdownParetoPage() {
           </TabsContent>
         </Tabs>
       )}
-      {/* --- AKHIR PERBAIKAN --- */}
     </div>
   );
 }
-
 
