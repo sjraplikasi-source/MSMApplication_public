@@ -13,15 +13,15 @@ import {
   ResponsiveContainer, 
   ReferenceLine 
 } from 'recharts';
-// --- PERBAIKAN: Menambahkan 'src/' ke alias path '@/' ---
+// --- PERBAIKAN: Menggunakan path relatif '../' ---
 import { 
   Tabs, 
   TabsContent, 
   TabsList, 
   TabsTrigger 
-} from "@/src/components/ui/tabs"; // Path diubah ke @/src/
-import { Card, CardContent } from "@/src/components/ui/card"; // Path diubah ke @/src/
-import { supabase } from '@/src/lib/supabase'; // Path diubah ke @/src/
+} from "../components/ui/tabs"; // Path diubah ke ../
+import { Card, CardContent } from "../components/ui/card"; // Path diubah ke ../
+import { supabase } from '../lib/supabase'; // Path diubah ke ../
 // ---
 import { format, startOfMonth } from 'date-fns';
 
@@ -212,4 +212,6 @@ export default function BreakdownParetoPage() {
     </div>
   );
 }
+
+
 
