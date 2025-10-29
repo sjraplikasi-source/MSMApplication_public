@@ -84,7 +84,7 @@ export default function App() {
             case 'this_month': startDate = format(startOfMonth(now), 'yyyy-MM-dd'); break;
             case 'last_30_days': startDate = format(subDays(now, 30), 'yyyy-MM-dd'); break;
         }
-        const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+        const endDate = format(now, 'yyyy-MM-dd');
 
         // Fetch semua data laporan dalam rentang waktu
         const { data: reports, error } = await supabase
