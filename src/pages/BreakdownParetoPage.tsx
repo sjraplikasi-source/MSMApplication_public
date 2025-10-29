@@ -197,7 +197,7 @@ export default function BreakdownParetoPage() {
           <Tab value="component" label="By Sub Component">
             <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
           </Tab>
-        </Tab>
+        </Tabs>
       )}
     </div>
   );
