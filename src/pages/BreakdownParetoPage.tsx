@@ -2,19 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Tabs, Tab } from "@/components/ui/tabs"; // Asumsi path ini benar -> Diubah ke alias
-import { Card, CardContent } from "@/components/ui/card"; // Asumsi path ini benar -> Diubah ke alias
-import { supabase } from '@/lib/supabase'; // <-- PERBAIKAN 1: Path diubah ke alias
-import { format, startOfMonth } from 'date-fns'; // <-- PERBAIKAN 2: Import date-fns
+import { Tabs, Tab } from "../../components/ui/tabs"; // Path diubah ke root project
+import { Card, CardContent } from "../../components/ui/card"; // Path diubah ke root project
+import { supabase } from '../../lib/supabase'; // Path diubah ke root project
+import { format, startOfMonth } from 'date-fns';
 
-// --- Tipe Data ---
 interface BreakdownData {
   label: string;
   duration: number;
   cumulativePercent: number;
 }
 
-// --- Komponen Chart ---
+// --- Komponen Chart dengan Garis Pareto ---
 const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) => {
   // console.log('Pareto Data:', data); // Dibiarkan jika masih perlu debugging
   return (
@@ -32,30 +31,40 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
             />
             <YAxis
               yAxisId="right"
-              type="number" // <-- PERBAIKAN 3: Typo '$1' dihapus
+              type="number"
               orientation="right"
-              domain={[0, 100]}
+              domain={[0, 100]} // Skala 0-100 untuk persentase
               ticks={[0, 20, 40, 60, 80, 100]}
               allowDataOverflow
               label={{ value: 'Cumulative %', angle: 90, position: 'insideRight' }}
             />
             <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" label={{ value: '80% Threshold', position: 'left', fill: 'green' }} />
-            <Tooltip />
+            <Tooltip
+              formatter={(value, name, props) => {
+                // Custom formatter untuk tooltip
+                if (name === "Cumulative %") {
+                  return [`${value}%`, name]; // Tambah '%' untuk persentase
+                }
+                return [`${value} hours`, name]; // Tambah 'hours' untuk durasi
+              }}
+            />
             <Legend />
             <Bar yAxisId="left" dataKey="duration" fill="#1E90FF" name="Duration (hours)" />
+            {/* --- INI PENAMBAHAN UNTUK GARIS PARETO --- */}
             <Line
               yAxisId="right"
-              type="monotone"
-              dataKey="cumulativePercent"
-              stroke="#FF0000"
-              name="Cumulative %"
+              type="monotone" // Bentuk garis (monotone smooth curve)
+              dataKey="cumulativePercent" // Data yang digunakan untuk garis
+              stroke="#FF0000" // Warna garis
+              name="Cumulative %" // Nama di legend
               strokeWidth={3}
-              dot={{ r: 4 }}
-              activeDot={{ r: 7 }}
+              dot={{ r: 4 }} // Titik-titik di garis
+              activeDot={{ r: 7 }} // Titik aktif saat dihover
               animationDuration={800}
-              strokeDasharray="0"
-              isAnimationActive={false} // Set ke false agar garis tidak re-render terus
+              strokeDasharray="0" // Garis solid
+              isAnimationActive={false} // Matikan animasi jika tidak diperlukan untuk performa
             />
+            {/* --- AKHIR PENAMBAHAN --- */}
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
@@ -63,32 +72,26 @@ const ParetoChart = ({ data, title }: { data: BreakdownData[]; title: string }) 
   );
 };
 
-// --- PERBAIKAN 4: Tentukan tanggal default di luar komponen ---
+// ... (sisa kode BreakdownParetoPage tetap sama) ...
 const today = new Date();
-// Format 'yyyy-MM-dd' penting agar sesuai dengan <input type="date">
 const defaultStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
 const defaultEndDate = format(today, 'yyyy-MM-dd');
 
-// --- Komponen Halaman Utama ---
 export default function BreakdownParetoPage() {
-  // --- PERBAIKAN 5: Gunakan tanggal default yang dinamis ---
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
-  // ---
   
   const [areaData, setAreaData] = useState<BreakdownData[]>([]);
   const [componentData, setComponentData] = useState<BreakdownData[]>([]);
-  const [loading, setLoading] = useState(true); // Tambahkan state loading
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true); // Mulai loading
+      setLoading(true);
       
-      // Validasi tanggal untuk memastikan endDate tidak sebelum startDate
       if (new Date(endDate) < new Date(startDate)) {
         console.error("End date cannot be before start date.");
         setLoading(false);
-        // Mungkin tampilkan notifikasi error ke user di sini
         return;
       }
 
@@ -109,7 +112,6 @@ export default function BreakdownParetoPage() {
         return;
       }
 
-      // Fungsi kalkulasi Pareto (tidak berubah)
       const groupAndCalculate = (key: 'area' | 'sub_component') => {
         const map: Record<string, number> = {};
         data.forEach((d) => {
@@ -121,10 +123,10 @@ export default function BreakdownParetoPage() {
 
         const sorted = Object.entries(map)
           .sort((a, b) => b[1] - a[1])
-          .map(([label, duration]) => ({ label, duration: parseFloat(duration.toFixed(2)) })); // Pastikan 2 desimal
+          .map(([label, duration]) => ({ label, duration: parseFloat(duration.toFixed(2)) }));
 
         let total = sorted.reduce((sum, d) => sum + d.duration, 0);
-        if (total === 0) total = 1; // Hindari pembagian dengan nol
+        if (total === 0) total = 1;
 
         let cumulative = 0;
         const calculated = sorted.map((item) => {
@@ -134,21 +136,19 @@ export default function BreakdownParetoPage() {
             cumulativePercent: parseFloat(((cumulative / total) * 100).toFixed(2))
           };
         });
-        // console.log('CALCULATED', key, calculated);
         return calculated;
       };
 
       setAreaData(groupAndCalculate('area'));
       setComponentData(groupAndCalculate('sub_component'));
-      setLoading(false); // Selesai loading
+      setLoading(false);
     };
 
     fetchData();
-  }, [startDate, endDate]); // Dependency array sudah benar
+  }, [startDate, endDate]);
 
   return (
     <div className="p-4 space-y-4">
-      {/* Kontrol Tanggal */}
       <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-lg shadow-sm border">
         <div className="flex flex-col">
           <label htmlFor="start-date" className="text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -167,13 +167,12 @@ export default function BreakdownParetoPage() {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            min={startDate} // Mencegah tanggal akhir sebelum tanggal mulai
+            min={startDate}
             className="border border-gray-300 px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      {/* Tampilan Tab Chart */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <p className="text-gray-500">Memuat data Pareto...</p>
@@ -191,4 +190,5 @@ export default function BreakdownParetoPage() {
     </div>
   );
 }
+
 
