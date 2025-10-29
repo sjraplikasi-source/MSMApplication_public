@@ -1,10 +1,10 @@
 // ==============================================
 // src/pages/MineMaintenance/WeeklyCheck.tsx
-// Versi Final dengan Sorting Desc & Filter Bulan
+// Final Version with Sorted Weeks + KPI Summary
 // ==============================================
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { format, getISOWeek } from 'date-fns';
+import { format, getISOWeek, parseISO } from 'date-fns';
 import WeeklyCheckForm from '@/components/mine/modals/WeeklyCheckForm';
 import EditActualDateModal from '@/components/mine/modals/EditActualDateModal';
 import * as XLSX from 'xlsx';
@@ -43,10 +43,10 @@ export default function WeeklyCheck() {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterMonth, setFilterMonth] = useState(''); // 🌟 new filter bulan
+  const [filterMonth, setFilterMonth] = useState('');
 
   const [page, setPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 3;
 
   useEffect(() => {
     fetchWeeklyChecks();
@@ -68,7 +68,7 @@ export default function WeeklyCheck() {
         )
       `
       )
-      .order('plan_date', { ascending: false }); // 🔄 Urutan terbaru ke terlama
+      .order('plan_date', { ascending: false }); // 🔄 Terbaru ke terlama
 
     if (error) {
       console.error('Fetch error:', error.message);
@@ -106,7 +106,6 @@ export default function WeeklyCheck() {
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Weekly Check');
-
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
     saveAs(blob, 'weekly_check_export.xlsx');
@@ -118,35 +117,42 @@ export default function WeeklyCheck() {
   const filtered = data.filter((d) => {
     const matchName = d.equipment_name.toLowerCase().includes(search.toLowerCase());
     const status = getStatus(d.plan_date, d.actual_date);
-
     const matchStatus =
       filterStatus === '' ||
       (filterStatus === 'done' && status.includes('Done')) ||
       (filterStatus === 'pending' && status.includes('Pending')) ||
       (filterStatus === 'missed' && status.includes('Missed'));
-
     const matchMonth =
       filterMonth === '' ||
       new Date(d.plan_date).getMonth() === parseInt(filterMonth);
-
     return matchName && matchStatus && matchMonth;
   });
 
   const grouped = filtered.reduce((acc: any, item: any) => {
-    const week = getISOWeek(new Date(item.plan_date));
+    const week = getISOWeek(parseISO(item.plan_date));
     if (!acc[week]) acc[week] = [];
     acc[week].push(item);
     return acc;
   }, {});
 
-  const totalPages = Math.ceil(Object.keys(grouped).length / 3);
-  const paginatedWeeks = Object.keys(grouped)
-    .slice((page - 1) * 3, (page - 1) * 3 + 3)
-    .sort((a, b) => parseInt(b) - parseInt(a)); // urutan minggu terbaru dulu
+  // Sort minggu terbaru dulu (descending)
+  const sortedWeeks = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => b - a);
+
+  const totalPages = Math.ceil(sortedWeeks.length / itemsPerPage);
+  const paginatedWeeks = sortedWeeks.slice(
+    (page - 1) * itemsPerPage,
+    (page - 1) * itemsPerPage + itemsPerPage
+  );
 
   // ================================
-  // Month List
+  // KPI Summary
   // ================================
+  const totalDone = filtered.filter((d) => getStatus(d.plan_date, d.actual_date).includes('Done')).length;
+  const totalPending = filtered.filter((d) => getStatus(d.plan_date, d.actual_date).includes('Pending')).length;
+  const totalMissed = filtered.filter((d) => getStatus(d.plan_date, d.actual_date).includes('Missed')).length;
+
   const monthList = [
     'Januari','Februari','Maret','April','Mei','Juni',
     'Juli','Agustus','September','Oktober','November','Desember'
@@ -180,6 +186,22 @@ export default function WeeklyCheck() {
         </div>
       </div>
 
+      {/* KPI Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+          <h3 className="text-green-700 font-semibold text-lg">{totalDone}</h3>
+          <p className="text-green-600 text-sm">Total Done</p>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+          <h3 className="text-yellow-700 font-semibold text-lg">{totalPending}</h3>
+          <p className="text-yellow-600 text-sm">Total Pending</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <h3 className="text-red-700 font-semibold text-lg">{totalMissed}</h3>
+          <p className="text-red-600 text-sm">Total Missed</p>
+        </div>
+      </div>
+
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4 items-center justify-between">
         <div className="flex flex-wrap gap-2 items-center">
@@ -205,7 +227,6 @@ export default function WeeklyCheck() {
             <option value="missed">❌ Missed</option>
           </select>
 
-          {/* 🌟 Filter Bulan */}
           <div className="relative">
             <Calendar className="absolute left-2 top-2.5 text-gray-400" size={16} />
             <select
@@ -303,7 +324,9 @@ export default function WeeklyCheck() {
           >
             Prev
           </button>
-          <span className="px-2 py-1">Halaman {page} / {totalPages}</span>
+          <span className="px-2 py-1">
+            Halaman {page} / {totalPages}
+          </span>
           <button
             onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
             disabled={page === totalPages}
