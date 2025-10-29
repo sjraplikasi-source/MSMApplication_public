@@ -193,7 +193,7 @@ export default function BreakdownParetoPage() {
         <Tabs defaultValue="area">
           <Tab value="area" label="By Area">
             <ParetoChart data={areaData} title={`Pareto Breakdown by Area (${startDate} - ${endDate})`} />
-          </TAb>
+          </Tab>
           <Tab value="component" label="By Sub Component">
             <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
           </Tab>
