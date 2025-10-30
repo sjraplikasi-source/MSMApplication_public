@@ -202,10 +202,10 @@ export default function BreakdownParetoPage() {
           
           {/* Ini adalah konten untuk tiap Tab */}
           <TabsContent value="area">
-            <ParetoChart data={areaData} title={`Pareto Breakdown by Area (${startDate} - ${endDate})`} />
+            <ParetoChart data={areaData} title={`Pareto R&M Activity by Area (${startDate} - ${endDate})`} />
           </TabsContent>
           <TabsContent value="component">
-            <ParetoChart data={componentData} title={`Pareto Breakdown by Component (${startDate} - ${endDate})`} />
+            <ParetoChart data={componentData} title={`Pareto R&M Activity by Component (${startDate} - ${endDate})`} />
           </TabsContent>
         </Tabs>
       )}
