@@ -88,7 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: "/dashboard", label: "Dashboard R&M", icon: LayoutDashboard },
     { path: "/reports", label: "Reports", icon: FileText, prefix: "/reports" },
     { path: "/validasi", label: "Reports Validation", icon: CheckCircle },
-    { path: "/pareto", label: "Pareto Breakdown", icon: BarChart2 },
+    { path: "/pareto", label: "Pareto R&M Activity", icon: BarChart2 },
     { path: "/download", label: "Download", icon: FileText },
   ];
   const NAV_BACKLOG: NavItem[] = [
