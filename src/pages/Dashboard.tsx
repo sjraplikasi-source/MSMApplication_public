@@ -291,7 +291,7 @@ export default function App() {
             By Problem Type
           </button>
         </div>
-        <ChartContainer title={`Pareto Breakdown ${paretoTab === 'equipment' ? 'by Equipment' : 'by Problem Type'}`} isLoading={loading}>
+        <ChartContainer title={`Pareto R&M Activity ${paretoTab === 'equipment' ? 'by Equipment' : 'by Problem Type'}`} isLoading={loading}>
           <ParetoChart data={paretoTab === 'equipment' ? paretoEquipment : paretoProblem} />
         </ChartContainer>
       </div>
