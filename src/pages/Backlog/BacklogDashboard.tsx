@@ -1,14 +1,14 @@
 // =============================
 // src/pages/Backlog/BacklogDashboard.tsx
 // =============================
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Filter, Download, Wrench, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // <-- FIX: Changed to relative path
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
-// Deklarasikan html2canvas agar TypeScript tidak error saat kita memanggilnya dari window
+// Deklarasikan html2canvas
 declare const html2canvas: any;
 
 // --- Tipe Data ---
@@ -26,7 +26,7 @@ type ResourceData = { name: string; value: number; filterKey: string; filterValu
 type PriorityData = { name: string; value: number };
 
 // --- Komponen UI ---
-const KpiCard = ({ title, value, description, icon: Icon, color, onClick }) => (
+const KpiCard = ({ title, value, description, icon: Icon, color, onClick }: any) => (
   <div 
     className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all cursor-pointer flex flex-col justify-between"
     onClick={onClick}
@@ -41,7 +41,8 @@ const KpiCard = ({ title, value, description, icon: Icon, color, onClick }) => (
     <p className="text-xs text-gray-400 mt-1">{description}</p>
   </div>
 );
-const ChartContainer = ({ title, children, isLoading }) => (
+
+const ChartContainer = ({ title, children, isLoading }: any) => (
   <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
     <h3 className="text-md font-semibold text-gray-700 mb-4">{title}</h3>
     <div style={{ width: '100%', height: 300 }}>
@@ -49,11 +50,12 @@ const ChartContainer = ({ title, children, isLoading }) => (
     </div>
   </div>
 );
-const ResourceTable = ({ data, navigate }) => (
+
+const ResourceTable = ({ data, navigate }: any) => (
     <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-full">
         <h3 className="text-md font-semibold text-gray-700 mb-4">Analisis Kebutuhan & Kesiapan</h3>
         <div className="space-y-3">
-            {data.map(item => (
+            {data.map((item: any) => (
                 <div 
                     key={item.name} 
                     className="flex justify-between items-center border-b pb-2 hover:bg-gray-50 p-2 rounded-md cursor-pointer"
@@ -66,6 +68,7 @@ const ResourceTable = ({ data, navigate }) => (
         </div>
     </div>
 );
+
 const COLORS = ['#FF8042', '#0088FE', '#00C49F'];
 const PRIORITY_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#6B7280'];
 
@@ -96,9 +99,10 @@ export default function App() {
         case 'this_year': default: startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
       }
 
+      // --- PERBAIKAN 1: Tambahkan 'estimated_ready_date' di select query ---
       const { data, error } = await supabase
         .from('backlogs')
-        .select('*, backlog_spareparts(stock_status)', { count: 'exact' })
+        .select('*, backlog_spareparts(stock_status, estimated_ready_date)', { count: 'exact' })
         .gte('created_at', startDate)
         .lte('created_at', endDate);
         
@@ -106,9 +110,9 @@ export default function App() {
 
       const openBacklogs = data.filter(b => b.status !== 'closed' && b.status !== 'rejected');
 
-      // --- LOGIKA BARU UNTUK MENGHITUNG PRIORITAS ---
+      // --- Hitung Prioritas ---
       const priorityCounts = openBacklogs.reduce((acc, backlog) => {
-        const priority = backlog.priority || 'Improve'; // Jika prioritas null, anggap 'Improve'
+        const priority = backlog.priority || 'Improve';
         acc[priority] = (acc[priority] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -118,19 +122,32 @@ export default function App() {
         { name: 'Medium', value: priorityCounts.Medium || 0 },
         { name: 'Low', value: priorityCounts.Low || 0 },
         { name: 'Improve', value: priorityCounts.Improve || 0 },
-      ].filter(p => p.value > 0); // Hanya tampilkan prioritas yang ada backlognya
+      ].filter(p => p.value > 0);
 
       setPriorityData(formattedPriorityData);
-      // --- AKHIR LOGIKA BARU ---
       
       const waitingValidation = openBacklogs.filter(b => b.status === 'draft').length;
       const waitingReview = openBacklogs.filter(b => b.status === 'validated').length;
-      // const waitingSupply = openBacklogs.filter(b => b.status === 'reviewed' && b.need_sparepart).length;
-      const waitingSupply = openBacklogs.filter(b => 
-    b.status === 'reviewed' && 
-    b.need_sparepart && 
-    b.supply_updated_at === null
-).length;
+      
+      // --- PERBAIKAN 2: Logika Menunggu Supply (Include Overdue) ---
+      const waitingSupply = openBacklogs.filter(b => {
+          // Hanya backlog 'reviewed' yang butuh sparepart
+          if (b.status !== 'reviewed' || !b.need_sparepart) return false;
+
+          // Kondisi 1: Belum pernah diupdate SM (NULL)
+          if (!b.supply_updated_at) return true;
+
+          // Kondisi 2: Sudah update, TAPI estimasinya sudah lewat (Overdue)
+          const parts = b.backlog_spareparts || [];
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset jam agar banding tanggal saja
+
+          const hasOverdue = parts.some((p: any) => 
+            p.estimated_ready_date && new Date(p.estimated_ready_date) < today
+          );
+
+          return hasOverdue;
+      }).length;
       
       let siapDikerjakanCount = 0;
       let waitingPartCount = 0;
@@ -140,7 +157,7 @@ export default function App() {
       let needToolsCount = 0;
       let needManpowerCount = 0;
 
-openBacklogs.forEach(b => {
+      openBacklogs.forEach(b => {
         if (b.need_shutdown) needShutdownCount++;
         if (b.need_tools) needToolsCount++;
         if (b.need_manpower) needManpowerCount++;
@@ -148,10 +165,10 @@ openBacklogs.forEach(b => {
         let isPartReady = false;
         if (!b.need_sparepart) {
             noPartNeededCount++;
-            isPartReady = true; // Langsung dianggap ready jika tidak butuh part
+            isPartReady = true;
         } else {
             const parts = b.backlog_spareparts || [];
-            if (parts.length > 0 && parts.every(p => p.stock_status?.toLowerCase() === 'ready')) {
+            if (parts.length > 0 && parts.every((p: any) => p.stock_status?.toLowerCase() === 'ready')) {
                 partCompleteCount++;
                 isPartReady = true;
             } else {
@@ -159,8 +176,6 @@ openBacklogs.forEach(b => {
             }
         }
         
-        // --- LOGIKA BARU YANG SUDAH DIPERBAIKI ---
-        // Sebuah backlog siap dikerjakan HANYA JIKA part-nya ready DAN tidak butuh shutdown
         if (isPartReady && !b.need_shutdown) {
             siapDikerjakanCount++;
         }
@@ -195,11 +210,8 @@ openBacklogs.forEach(b => {
 
   const handleDownloadImage = async () => {
     if (!dashboardRef.current) return;
-
     if (typeof (window as any).html2canvas === 'undefined') {
-      alert('Gagal: Library untuk download belum siap. Pastikan script sudah ditambahkan di index.html dan coba refresh halaman.');
-      console.error("html2canvas is not defined on the window object.");
-      return;
+      alert('Gagal: Library belum siap.'); return;
     }
 
     setIsDownloading(true);
@@ -217,7 +229,7 @@ openBacklogs.forEach(b => {
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error downloading image:', error);
+      console.error('Error:', error);
     } finally {
       setIsDownloading(false);
     }
@@ -254,7 +266,17 @@ openBacklogs.forEach(b => {
             <KpiCard title="Total Backlog Open" value={kpiData.totalOpen} description="Semua status kecuali Closed & Rejected" icon={Wrench} color="text-gray-500" onClick={() => navigate('/Backlog/list?status=open')} />
             <KpiCard title="Menunggu Validasi" value={kpiData.waitingValidation} description="Status 'draft'" icon={AlertTriangle} color="text-red-500" onClick={() => navigate('/Backlog/list?status=draft')} />
             <KpiCard title="Menunggu Review" value={kpiData.waitingReview} description="Status 'validated'" icon={Clock} color="text-yellow-500" onClick={() => navigate('/Backlog/list?status=validated')} />
-            <KpiCard title="Menunggu Update SM" value={kpiData.waitingSupply} description="Perlu update status part" icon={Clock} color="text-purple-500" onClick={() => navigate('/supply/backlog?smFilter=needs_update&statusFilter=validated_reviewed')} />
+            
+            {/* LINK INI SUDAH DISESUAIKAN DENGAN FILTER SUPPLY LIST YANG BARU */}
+            <KpiCard 
+                title="Menunggu Update SM" 
+                value={kpiData.waitingSupply} 
+                description="Pending & Overdue Estimasi" 
+                icon={Clock} 
+                color="text-purple-500" 
+                onClick={() => navigate('/supply/backlog?smFilter=action_required')} 
+            />
+            
             <KpiCard title="Siap Dikerjakan" value={kpiData.siapDikerjakan} description="Part ready & tidak butuh shutdown" icon={CheckCircle} color="text-green-500" onClick={() => navigate('/Backlog/list?part_status=complete&need_shutdown=false')} />
           </div>
 
@@ -270,16 +292,7 @@ openBacklogs.forEach(b => {
           <ChartContainer title="Status Kesiapan Part" isLoading={loading}>
             <ResponsiveContainer>
               <PieChart>
-                <Pie 
-                  data={partStatusData} 
-                  cx="50%" 
-                  cy="50%" 
-                  labelLine={false} 
-                  outerRadius={80} 
-                  fill="#8884d8" 
-                  dataKey="value" 
-                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                >
+                <Pie data={partStatusData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
                   {partStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
                 </Pie>
                 <Tooltip />
@@ -291,20 +304,8 @@ openBacklogs.forEach(b => {
           <ChartContainer title="Status Prioritas Backlog" isLoading={loading}>
             <ResponsiveContainer>
               <PieChart>
-                <Pie 
-                  data={priorityData} 
-                  cx="50%" 
-                  cy="50%" 
-                  labelLine={false}
-                  innerRadius={60}
-                  outerRadius={80} 
-                  fill="#8884d8" 
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {priorityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[index % PRIORITY_COLORS.length]} />
-                  ))}
+                <Pie data={priorityData} cx="50%" cy="50%" labelLine={false} innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                  {priorityData.map((entry, index) => (<Cell key={`cell-${index}`} fill={PRIORITY_COLORS[index % PRIORITY_COLORS.length]} />))}
                 </Pie>
                 <Tooltip />
                 <Legend />
@@ -316,8 +317,6 @@ openBacklogs.forEach(b => {
             <ResourceTable data={resourceData} navigate={navigate} />
           </div>
         </div>
-        {/* --- AKHIR DARI BAGIAN YANG DIMODIFIKASI --- */}
-
         </>
         )}
       </div>
