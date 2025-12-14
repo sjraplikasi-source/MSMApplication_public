@@ -53,7 +53,7 @@ const SupplyList: React.FC = () => {
   
   // Default filter diset ke "action_required" (Perlu Tindakan)
   const [smFilter, setSmFilter] = useState<SmFilter>("action_required");
-  const [statusFilter, setStatusFilter] = useState<"validated_reviewed" | "all">("validated_reviewed");
+  const [statusFilter, setStatusFilter] = useState<"validated_reviewed" | "all">("all");
 
   // --- State Sorting & Paging ---
   const [sortBy, setSortBy] = useState<SortBy>("date");
