@@ -42,6 +42,8 @@ import { useAuth } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
 import ToolRoom from "./pages/ToolRoom";
 
+import AutoUpdateHandler from './components/AutoUpdateHandler';
+
 
 // Lazy load modul MineMaintenance
 const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
@@ -150,6 +152,7 @@ function App() {
   return (
     <BrowserRouter>
       <AppRoutes />
+      <AutoUpdateHandler />
       <Toaster position="top-right" />
     </BrowserRouter>
   );
