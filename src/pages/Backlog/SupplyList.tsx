@@ -1,4 +1,4 @@
-// src/pages/Backlog/SupplyList.tsx
+// src/pages/Backlog/SupplyList.tsx (LENGKAP & FINAL)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,11 +23,9 @@ type BacklogRow = {
 };
 type SortBy = "date" | "registration_code" | "unit_code" | "status";
 type SortDir = "asc" | "desc";
-
-// --- [UPDATE 1] Tambah status filter baru ---
-type SmFilter = "all" | "needs_update" | "updated" | "needs_estimation";
-
+type SmFilter = "all" | "needs_update" | "updated";
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
 
 const SupplyList: React.FC = () => {
   const navigate = useNavigate();
@@ -69,49 +67,24 @@ const SupplyList: React.FC = () => {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
-        // --- [UPDATE 2] Logic Select Dinamis ---
-        // Jika filter "Perlu Update Estimasi", gunakan !inner join untuk filter berdasarkan child
-        const sparepartRelation = smFilter === 'needs_estimation' 
-            ? 'backlog_spareparts!inner' // Inner join memaksa filter child berpengaruh ke parent
-            : 'backlog_spareparts';      // Left join biasa
-
         let query = supabase
           .from("backlogs")
           .select(
-            `id, registration_code, unit_code, problem, date, status, need_sparepart, supply_updated_at, ${sparepartRelation} (stock_status, estimated_ready_date)`,
+            `id, registration_code, unit_code, problem, date, status, need_sparepart, supply_updated_at, backlog_spareparts (stock_status, estimated_ready_date)`,
             { count: "exact" }
           )
           .eq("need_sparepart", true);
 
-        // Filter Status Backlog
         if (statusFilter === "validated_reviewed") {
           query = query.in("status", ["validated", "reviewed"]);
         }
-
-        // Filter Pencarian Text
         if (qDebounced) {
           query = query.or(`registration_code.ilike.%${qDebounced}%,unit_code.ilike.%${qDebounced}%,problem.ilike.%${qDebounced}%`);
         }
-
-        // Filter Tanggal
         if (dateFrom) query = query.gte("date", dateFrom);
         if (dateTo) query = query.lte("date", dateTo);
-
-        // --- [UPDATE 3] Logic Filter SM ---
-        if (smFilter === "needs_update") {
-            // Belum pernah diupdate SM
-            query = query.is("supply_updated_at", null);
-        } else if (smFilter === "updated") {
-            // Sudah pernah diupdate (termasuk yang estimasi overdue)
-            query = query.not("supply_updated_at", "is", null);
-        } else if (smFilter === "needs_estimation") {
-            // Sudah update TAPI estimasinya sudah lewat (Overdue)
-            const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-            query = query
-                .not("supply_updated_at", "is", null)
-                // Filter sparepart yang estimated_date < hari ini
-                .lt(`${sparepartRelation}.estimated_ready_date`, todayStr);
-        }
+        if (smFilter === "needs_update") query = query.is("supply_updated_at", null);
+        if (smFilter === "updated") query = query.not("supply_updated_at", "is", null);
 
         query = query.order(sortBy, { ascending: sortDir === "asc" }).range(from, to);
 
@@ -121,7 +94,6 @@ const SupplyList: React.FC = () => {
         setRows((data as BacklogRow[]) ?? []);
         setTotal(count || 0);
       } catch (e: any) {
-        console.error(e); // Cek console jika query error
         setError(e?.message || "Gagal memuat data.");
       } finally {
         setLoading(false);
@@ -147,8 +119,7 @@ const SupplyList: React.FC = () => {
   const handleDownloadExcel = async () => {
     setDownloading(true);
     try {
-      // Pastikan fungsi export mendukung parameter filter baru jika diperlukan
-      await exportSupplyListExcel({ q: qDebounced, dateFrom, dateTo, smFilter: smFilter as any, statusFilter });
+      await exportSupplyListExcel({ q: qDebounced, dateFrom, dateTo, smFilter, statusFilter });
     } catch (error) {
       console.error("Gagal mendownload Excel:", error);
       alert("Gagal mendownload file Excel. Lihat konsol untuk detail.");
@@ -181,18 +152,14 @@ const SupplyList: React.FC = () => {
                 <label className="block text-sm font-medium mb-1">Search</label>
                 <input placeholder="Cari kode, unit, atau problem..." className="w-full border rounded px-3 py-2" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            
-            {/* --- [UPDATE 4] Dropdown Menu --- */}
             <div className="lg:col-span-2">
                 <label className="block text-sm font-medium mb-1">Progress SM</label>
                 <select className="w-full border rounded px-3 py-2 bg-white" value={smFilter} onChange={(e) => setSmFilter(e.target.value as SmFilter)}>
                     <option value="needs_update">Perlu Update</option>
-                    <option value="needs_estimation">Perlu Update Estimasi (Overdue)</option>
-                    <option value="updated">Sudah Update (Semua)</option>
+                    <option value="updated">Sudah Update</option>
                     <option value="all">Semua</option>
                 </select>
             </div>
-
             <div className="lg:col-span-2">
                 <label className="block text-sm font-medium mb-1">Status Backlog</label>
                 <select className="w-full border rounded px-3 py-2 bg-white" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
