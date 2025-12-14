@@ -24,7 +24,7 @@ type Backlog = {
   need_shutdown: boolean;
   shutdown_required: boolean | null;
   priority?: string | null;
-  // --- [NEW FEATURE] Tambahkan field ini agar bisa dicek ---
+  // Field untuk SM
   supply_updated_at?: string | null;
   supply_updated_by?: string | null;
 };
@@ -97,7 +97,7 @@ const BacklogDetail: React.FC = () => {
   });
 
   const [mechanicOptions, setMechanicOptions] = useState<ManpowerOption[]>([]);
-  const [mechanics, setMechanics] = useState<ManpowerOption[]>([]); // << multi
+  const [mechanics, setMechanics] = useState<ManpowerOption[]>([]); 
 
   // --- LOGIKA UNTUK MENENTUKAN APAKAH TOMBOL EDIT MUNCUL ---
   const canEdit = useMemo(() => {
@@ -105,8 +105,8 @@ const BacklogDetail: React.FC = () => {
     const role = user.role?.toLowerCase() || '';
     const status = b.status;
 
-    if (role === 'admin') return true; // Admin bisa edit kapan saja kecuali sudah final
-    if (status === 'closed' || status === 'rejected') return false; // Tidak bisa edit jika sudah final
+    if (role === 'admin') return true; 
+    if (status === 'closed' || status === 'rejected') return false; 
 
     if ((status === 'draft' || status === 'validated') && role === 'planner') {
       return true;
@@ -202,15 +202,19 @@ const BacklogDetail: React.FC = () => {
     }
   }, [b?.status]);
 
-  // --- [NEW FEATURE] LOGIC RESET SUPPLY MANAGEMENT ---
+  // --- FEATURE: RESET SUPPLY MANAGEMENT ---
+  // Bisa diakses siapa saja, tidak ada cek role
   const handleResetSM = async () => {
     if (!b || !id) return;
     
-    const confirmMsg = "Yakin ingin mereset status Supply Management?\n\nData estimasi tanggal & status stok akan dikembalikan ke 'Perlu Update' di sisi Supply Management.";
+    const confirmMsg = "Yakin ingin mereset status Supply Management?\n\nData estimasi & status update dari SM akan dihapus (kembali ke 'Perlu Update').";
     if (!window.confirm(confirmMsg)) return;
 
     try {
         setSaving(true);
+        console.log("Resetting SM status for ID:", id);
+
+        // Update ke NULL
         const { error } = await supabase
             .from('backlogs')
             .update({ 
@@ -219,15 +223,26 @@ const BacklogDetail: React.FC = () => {
             })
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase Error:", error);
+            throw error;
+        }
 
-        // Update local state agar tombol langsung hilang tanpa refresh
-        setB(prev => prev ? ({ ...prev, supply_updated_at: null, supply_updated_by: null }) : null);
-        alert("Status Supply Management berhasil di-reset.");
+        // Update state lokal agar UI langsung berubah
+        setB(prev => {
+            if (!prev) return null;
+            return { 
+                ...prev, 
+                supply_updated_at: null, 
+                supply_updated_by: null 
+            };
+        });
+
+        alert("Berhasil! Status Supply Management telah di-reset.");
 
     } catch (e: any) {
         console.error(e);
-        alert("Gagal reset status: " + (e?.message || e));
+        alert("Gagal reset status: " + (e?.message || "Terjadi kesalahan sistem"));
     } finally {
         setSaving(false);
     }
@@ -242,20 +257,17 @@ const BacklogDetail: React.FC = () => {
     }
     try {
       setSaving(true);
-
       const mechanicNames = mechanics.map((o) => o.label).join(", ");
-
-      // insert closing record
       const currentUserId = user?.id ?? null;
+      
       const { error: cErr } = await supabase.from("backlog_closings").insert({
         backlog_id: id,
         closed_by: currentUserId,
         closed_date: closedDate || null,
-        mechanic_name: mechanicNames, // gabungan nama mekanik
+        mechanic_name: mechanicNames, 
       });
       if (cErr) throw cErr;
 
-      // update backlog status -> closed
       const { error: uErr } = await supabase
         .from("backlogs")
         .update({ status: "closed" })
@@ -302,9 +314,11 @@ const BacklogDetail: React.FC = () => {
           </div>
           <div className="mt-2 flex gap-2 items-center">
             <Badge color={badgeColor}>{b.status}</Badge>
-            {/* Indikator jika Supply Management sudah update */}
-            {b.supply_updated_at && (
+            {/* Indikator visual status SM */}
+            {b.supply_updated_at ? (
                 <Badge color="bg-orange-100 text-orange-700">SM Updated</Badge>
+            ) : (
+                <Badge color="bg-gray-100 text-gray-500">SM Waiting</Badge>
             )}
           </div>
           <div className="mt-2">
@@ -319,7 +333,6 @@ const BacklogDetail: React.FC = () => {
           </div>
         </div>
         
-        {/* Navigasi Header */}
         <div className="flex flex-col items-end gap-2">
             <Button variant="outline" onClick={() => navigate(-1)}>
             Kembali
@@ -327,7 +340,7 @@ const BacklogDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* --- TOMBOL ACTION (Edit & Reset) --- */}
+      {/* --- TOMBOL ACTION --- */}
       <div className="flex items-center gap-2">
         {canEdit && (
           <Button onClick={() => navigate(`/backlog/edit/${id}`)}>
@@ -335,11 +348,11 @@ const BacklogDetail: React.FC = () => {
           </Button>
         )}
 
-        {/* --- [NEW FEATURE] Tombol Reset Status SM --- */}
-        {/* Hanya muncul jika user Admin DAN data sudah diupdate SM */}
-        {user?.role === 'admin' && b.supply_updated_at && (
+        {/* --- TOMBOL RESET SM --- */}
+        {/* Muncul jika data supply_updated_at ADA ISINYA (tidak null) */}
+        {b.supply_updated_at && (
             <Button 
-                className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-200"
+                className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
                 onClick={handleResetSM}
                 disabled={saving}
             >
