@@ -23,6 +23,10 @@ type Backlog = {
   need_manpower: boolean;
   need_shutdown: boolean;
   shutdown_required: boolean | null;
+  priority?: string | null;
+  // --- [NEW FEATURE] Tambahkan field ini agar bisa dicek ---
+  supply_updated_at?: string | null;
+  supply_updated_by?: string | null;
 };
 
 type Spare = {
@@ -69,14 +73,10 @@ const Badge: React.FC<{ children: React.ReactNode; color?: string }> = ({
   </span>
 );
 
-const cardCls = "border rounded-lg bg-white";
-
 const BacklogDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-
-  
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -202,6 +202,38 @@ const BacklogDetail: React.FC = () => {
     }
   }, [b?.status]);
 
+  // --- [NEW FEATURE] LOGIC RESET SUPPLY MANAGEMENT ---
+  const handleResetSM = async () => {
+    if (!b || !id) return;
+    
+    const confirmMsg = "Yakin ingin mereset status Supply Management?\n\nData estimasi tanggal & status stok akan dikembalikan ke 'Perlu Update' di sisi Supply Management.";
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+        setSaving(true);
+        const { error } = await supabase
+            .from('backlogs')
+            .update({ 
+                supply_updated_at: null, 
+                supply_updated_by: null 
+            })
+            .eq('id', id);
+
+        if (error) throw error;
+
+        // Update local state agar tombol langsung hilang tanpa refresh
+        setB(prev => prev ? ({ ...prev, supply_updated_at: null, supply_updated_by: null }) : null);
+        alert("Status Supply Management berhasil di-reset.");
+
+    } catch (e: any) {
+        console.error(e);
+        alert("Gagal reset status: " + (e?.message || e));
+    } finally {
+        setSaving(false);
+    }
+  };
+  // ---------------------------------------------------
+
   const handleCloseBacklog = async () => {
     if (!b || !id) return;
     if (mechanics.length === 0) {
@@ -230,15 +262,13 @@ const BacklogDetail: React.FC = () => {
         .eq("id", id);
       if (uErr) throw uErr;
 
-await pushNotif({
-  backlog_id: id,
-  title: "Backlog ditutup",
-  // AMBIL registration_code DARI STATE 'b'
-  body: `Backlog ${b.registration_code ?? ""} telah ditutup.`,
-  target_role: "planner",
-});
+      await pushNotif({
+        backlog_id: id,
+        title: "Backlog ditutup",
+        body: `Backlog ${b.registration_code ?? ""} telah ditutup.`,
+        target_role: "planner",
+      });
       
-     // navigate(-1);
       window.location.href = '/Backlog/list'; 
     } catch (e: any) {
       console.error(e);
@@ -270,32 +300,53 @@ await pushNotif({
               <span className="font-medium">Unit:</span> {b.unit_code}
             </div>
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex gap-2 items-center">
             <Badge color={badgeColor}>{b.status}</Badge>
-            <div className="mt-2">
-    <span className="text-xs font-semibold mr-2">PRIORITY:</span>
-    <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${
-    b.priority === 'High' ? 'bg-red-600' :
-    b.priority === 'Medium' ? 'bg-yellow-500' :
-    b.priority === 'Low' ? 'bg-blue-500' : 'bg-gray-500'
-}`}>
-    {b.priority || 'Low'}
-    </span>
-</div>
+            {/* Indikator jika Supply Management sudah update */}
+            {b.supply_updated_at && (
+                <Badge color="bg-orange-100 text-orange-700">SM Updated</Badge>
+            )}
+          </div>
+          <div className="mt-2">
+            <span className="text-xs font-semibold mr-2">PRIORITY:</span>
+            <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${
+            b.priority === 'High' ? 'bg-red-600' :
+            b.priority === 'Medium' ? 'bg-yellow-500' :
+            b.priority === 'Low' ? 'bg-blue-500' : 'bg-gray-500'
+            }`}>
+            {b.priority || 'Low'}
+            </span>
           </div>
         </div>
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          Kembali
-        </Button>
+        
+        {/* Navigasi Header */}
+        <div className="flex flex-col items-end gap-2">
+            <Button variant="outline" onClick={() => navigate(-1)}>
+            Kembali
+            </Button>
+        </div>
       </div>
 
-      {/* --- TOMBOL EDIT DITAMBAHKAN DI SINI --- */}
+      {/* --- TOMBOL ACTION (Edit & Reset) --- */}
       <div className="flex items-center gap-2">
         {canEdit && (
           <Button onClick={() => navigate(`/backlog/edit/${id}`)}>
             Edit Backlog
           </Button>
         )}
+
+        {/* --- [NEW FEATURE] Tombol Reset Status SM --- */}
+        {/* Hanya muncul jika user Admin DAN data sudah diupdate SM */}
+        {user?.role === 'admin' && b.supply_updated_at && (
+            <Button 
+                className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-200"
+                onClick={handleResetSM}
+                disabled={saving}
+            >
+                {saving ? "Memproses..." : "Reset Status SM"}
+            </Button>
+        )}
+        
         <Button variant="outline" onClick={() => navigate(-1)}>
           Kembali
         </Button>
@@ -347,14 +398,14 @@ await pushNotif({
                       <td className="p-2">{s.no_wr_pr ?? "-"}</td>
                       <td className="p-2">{s.no_po ?? "-"}</td>
                       <td className="p-2">
-  {s.image_url ? (
-    <a href={s.image_url} target="_blank" rel="noopener noreferrer">
-      <img src={s.image_url} alt="Part" className="h-12 w-12 object-cover rounded border hover:opacity-80" />
-    </a>
-  ) : (
-    "-"
-  )}
-</td>
+                      {s.image_url ? (
+                        <a href={s.image_url} target="_blank" rel="noopener noreferrer">
+                          <img src={s.image_url} alt="Part" className="h-12 w-12 object-cover rounded border hover:opacity-80" />
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
                     </tr>
                   ))}
                 </tbody>
