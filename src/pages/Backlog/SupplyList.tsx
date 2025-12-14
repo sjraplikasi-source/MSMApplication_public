@@ -1,4 +1,4 @@
-// src/pages/Backlog/SupplyList.tsx (LENGKAP & FINAL)
+// src/pages/Backlog/SupplyList.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,9 +23,11 @@ type BacklogRow = {
 };
 type SortBy = "date" | "registration_code" | "unit_code" | "status";
 type SortDir = "asc" | "desc";
-type SmFilter = "all" | "needs_update" | "updated";
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
+// Filter status
+type SmFilter = "all" | "needs_update" | "updated" | "needs_estimation";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
 const SupplyList: React.FC = () => {
   const navigate = useNavigate();
@@ -67,6 +69,32 @@ const SupplyList: React.FC = () => {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
+        // --- [STEP 1: PRE-FETCH LOGIC] ---
+        // Jika filter "Perlu Update Estimasi", kita cari dulu ID Backlog-nya
+        let filterIds: string[] | null = null;
+
+        if (smFilter === 'needs_estimation') {
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            // Cari sparepart yang overdue
+            const { data: parts, error: partsErr } = await supabase
+                .from('backlog_spareparts')
+                .select('backlog_id')
+                .lt('estimated_ready_date', todayStr); // Tanggal estimasi < Hari ini
+            
+            if (partsErr) throw partsErr;
+
+            // Ambil ID unik dari hasil query di atas
+            if (parts && parts.length > 0) {
+                // @ts-ignore
+                filterIds = Array.from(new Set(parts.map(p => p.backlog_id)));
+            } else {
+                // Jika tidak ada sparepart yang overdue, set array kosong agar hasil query utama juga kosong
+                filterIds = [];
+            }
+        }
+
+        // --- [STEP 2: MAIN QUERY] ---
         let query = supabase
           .from("backlogs")
           .select(
@@ -75,16 +103,39 @@ const SupplyList: React.FC = () => {
           )
           .eq("need_sparepart", true);
 
+        // Terapkan Filter ID dari Step 1 jika ada
+        if (smFilter === 'needs_estimation') {
+            if (filterIds && filterIds.length > 0) {
+                query = query.in('id', filterIds);
+                // Pastikan juga status supply sudah pernah diupdate (bukan null)
+                query = query.not("supply_updated_at", "is", null);
+            } else {
+                // Trik: Jika tidak ada data overdue, filter ID dengan nilai mustahil biar return kosong
+                query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+            }
+        }
+
+        // Filter Status Backlog
         if (statusFilter === "validated_reviewed") {
           query = query.in("status", ["validated", "reviewed"]);
         }
+
+        // Filter Pencarian Text
         if (qDebounced) {
           query = query.or(`registration_code.ilike.%${qDebounced}%,unit_code.ilike.%${qDebounced}%,problem.ilike.%${qDebounced}%`);
         }
+
+        // Filter Tanggal
         if (dateFrom) query = query.gte("date", dateFrom);
         if (dateTo) query = query.lte("date", dateTo);
-        if (smFilter === "needs_update") query = query.is("supply_updated_at", null);
-        if (smFilter === "updated") query = query.not("supply_updated_at", "is", null);
+
+        // Filter Progress SM lainnya
+        if (smFilter === "needs_update") {
+            query = query.is("supply_updated_at", null);
+        } else if (smFilter === "updated") {
+            query = query.not("supply_updated_at", "is", null);
+        } 
+        // Note: 'needs_estimation' sudah dihandle via pre-fetch di atas
 
         query = query.order(sortBy, { ascending: sortDir === "asc" }).range(from, to);
 
@@ -94,6 +145,7 @@ const SupplyList: React.FC = () => {
         setRows((data as BacklogRow[]) ?? []);
         setTotal(count || 0);
       } catch (e: any) {
+        console.error(e); 
         setError(e?.message || "Gagal memuat data.");
       } finally {
         setLoading(false);
@@ -119,7 +171,7 @@ const SupplyList: React.FC = () => {
   const handleDownloadExcel = async () => {
     setDownloading(true);
     try {
-      await exportSupplyListExcel({ q: qDebounced, dateFrom, dateTo, smFilter, statusFilter });
+      await exportSupplyListExcel({ q: qDebounced, dateFrom, dateTo, smFilter: smFilter as any, statusFilter });
     } catch (error) {
       console.error("Gagal mendownload Excel:", error);
       alert("Gagal mendownload file Excel. Lihat konsol untuk detail.");
@@ -152,14 +204,17 @@ const SupplyList: React.FC = () => {
                 <label className="block text-sm font-medium mb-1">Search</label>
                 <input placeholder="Cari kode, unit, atau problem..." className="w-full border rounded px-3 py-2" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
+            
             <div className="lg:col-span-2">
                 <label className="block text-sm font-medium mb-1">Progress SM</label>
                 <select className="w-full border rounded px-3 py-2 bg-white" value={smFilter} onChange={(e) => setSmFilter(e.target.value as SmFilter)}>
                     <option value="needs_update">Perlu Update</option>
-                    <option value="updated">Sudah Update</option>
+                    <option value="needs_estimation">Perlu Update Estimasi (Overdue)</option>
+                    <option value="updated">Sudah Update (Semua)</option>
                     <option value="all">Semua</option>
                 </select>
             </div>
+
             <div className="lg:col-span-2">
                 <label className="block text-sm font-medium mb-1">Status Backlog</label>
                 <select className="w-full border rounded px-3 py-2 bg-white" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
