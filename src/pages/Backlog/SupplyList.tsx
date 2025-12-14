@@ -149,9 +149,12 @@ const SupplyList: React.FC = () => {
         }
         // "all" -> tidak ada filter tambahan pada supply_updated_at
 
-        // Filter Status Backlog (Opsional)
+        // --- [UPDATE: FILTER STATUS BACKLOG] ---
         if (statusFilter === "validated_reviewed") {
           query = query.in("status", ["validated", "reviewed"]);
+        } else {
+          // Jika "Semua Status", kita tetap exclude CLOSED & REJECTED
+          query = query.neq("status", "closed").neq("status", "rejected");
         }
 
         // Filter Pencarian Text
@@ -253,7 +256,7 @@ const SupplyList: React.FC = () => {
                 <label className="block text-sm font-medium mb-1">Status Backlog</label>
                 <select className="w-full border rounded px-3 py-2 bg-white" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
                     <option value="validated_reviewed">Validated & Reviewed</option>
-                    <option value="all">Semua Status</option>
+                    <option value="all">Semua Status (Active)</option>
                 </select>
             </div>
             
