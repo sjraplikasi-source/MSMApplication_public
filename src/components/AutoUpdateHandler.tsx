@@ -1,47 +1,48 @@
 // src/components/AutoUpdateHandler.tsx
 
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 const AutoUpdateHandler: React.FC = () => {
   const [showUpdate, setShowUpdate] = useState(false);
 
   useEffect(() => {
-    // 1. Cek versi saat pertama kali load
     let currentVersion: number | null = null;
 
     const checkVersion = async () => {
       try {
-        // Tambah timestamp di URL fetch agar browser TIDAK men-cache request ini
         const res = await fetch(`/version.json?t=${Date.now()}`);
+        
+        // 1. Cek apakah request sukses (Status 200 OK)
+        if (!res.ok) return;
+
+        // 2. Cek apakah yang dikembalikan benar-benar JSON
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            // Jika balikannya HTML (<!doctype...), hentikan proses biar gak error
+            return; 
+        }
+
         const data = await res.json();
         const serverVersion = data.version;
 
         if (currentVersion === null) {
-          // Init pertama kali
           currentVersion = serverVersion;
         } else if (currentVersion !== serverVersion) {
-          // Jika versi di memori beda dengan server -> Munculkan Notifikasi
           setShowUpdate(true);
         }
       } catch (error) {
-        console.error("Gagal cek versi:", error);
+        // Silent error (jangan spam console jika gagal fetch di local)
+        // console.warn("AutoUpdate check skipped:", error); 
       }
     };
 
-    // Jalankan pengecekan pertama
     checkVersion();
-
-    // 2. Set interval pengecekan setiap 60 detik (1 menit)
-    // Jangan terlalu cepat biar gak membebani server, jangan terlalu lama biar update cepat sampai.
-    const interval = setInterval(checkVersion, 60 * 1000);
-
-    // Bersihkan interval saat komponen di-unmount
+    const interval = setInterval(checkVersion, 60 * 1000); // Cek tiap 1 menit
     return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = () => {
-    // Reload halaman secara paksa & bersihkan cache
     window.location.reload();
   };
 
@@ -56,7 +57,7 @@ const AutoUpdateHandler: React.FC = () => {
         <div className="flex-1">
           <h4 className="font-bold text-sm">Update Tersedia!</h4>
           <p className="text-xs text-blue-100 mt-1">
-            Versi baru aplikasi telah dirilis. Silakan refresh untuk fitur terbaru.
+            Versi baru aplikasi telah dirilis.
           </p>
         </div>
         <div className="flex flex-col gap-2">
