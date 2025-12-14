@@ -42,7 +42,7 @@ const SupplyList: React.FC = () => {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [smFilter, setSmFilter] = useState<SmFilter>("needs_update");
-  const [statusFilter, setStatusFilter] = useState<"validated_reviewed" | "all">("validated_reviewed");
+  const [statusFilter, setStatusFilter] = useState<"validated_reviewed" | "all">("all");
 
   // Sorting & Paging
   const [sortBy, setSortBy] = useState<SortBy>("date");
