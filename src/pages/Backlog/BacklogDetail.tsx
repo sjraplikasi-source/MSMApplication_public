@@ -202,24 +202,24 @@ const BacklogDetail: React.FC = () => {
     }
   }, [b?.status]);
 
-  // --- FEATURE: RESET SUPPLY MANAGEMENT ---
-  // Bisa diakses siapa saja, tidak ada cek role
+// --- FEATURE: RESET SUPPLY MANAGEMENT ---
   const handleResetSM = async () => {
     if (!b || !id) return;
     
-    const confirmMsg = "Yakin ingin mereset status Supply Management?\n\nData estimasi & status update dari SM akan dihapus (kembali ke 'Perlu Update').";
+    const confirmMsg = "Yakin ingin mereset status Supply Management?\n\nStatus Backlog akan dikembalikan menjadi 'REVIEWED' dan data estimasi SM akan dihapus.";
     if (!window.confirm(confirmMsg)) return;
 
     try {
         setSaving(true);
-        console.log("Resetting SM status for ID:", id);
+        console.log("Resetting SM status & Backlog status for ID:", id);
 
-        // Update ke NULL
+        // UPDATE: Reset field SM sekaligus kembalikan status backlog ke 'reviewed'
         const { error } = await supabase
             .from('backlogs')
             .update({ 
                 supply_updated_at: null, 
-                supply_updated_by: null 
+                supply_updated_by: null,
+                status: 'reviewed' // <--- INI TAMBAHAN PENTINGNYA
             })
             .eq('id', id);
 
@@ -228,17 +228,18 @@ const BacklogDetail: React.FC = () => {
             throw error;
         }
 
-        // Update state lokal agar UI langsung berubah
+        // Update state lokal agar UI langsung berubah tanpa refresh
         setB(prev => {
             if (!prev) return null;
             return { 
                 ...prev, 
                 supply_updated_at: null, 
-                supply_updated_by: null 
+                supply_updated_by: null,
+                status: 'reviewed' // <--- Update state lokal juga
             };
         });
 
-        alert("Berhasil! Status Supply Management telah di-reset.");
+        alert("Berhasil! Status Supply di-reset dan Backlog kembali ke status 'Reviewed'.");
 
     } catch (e: any) {
         console.error(e);
