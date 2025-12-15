@@ -163,7 +163,7 @@ const ReportEdit = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg mt-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Edit Laporan Breakdown</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">Edit Laporan Breakdown rev1</h2>
       
       {error && <div className="bg-red-100 text-red-700 p-3 mb-4 rounded border border-red-200">{error}</div>}
 
