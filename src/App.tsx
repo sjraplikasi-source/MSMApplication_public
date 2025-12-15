@@ -92,7 +92,7 @@ function AppRoutes() {
         {/* Reports */}
         <Route path="/reports" element={<ProtectedRoute><Layout><ReportList /></Layout></ProtectedRoute>} />
         <Route path="/reports/new" element={<ProtectedRoute><Layout><ReportForm /></Layout></ProtectedRoute>} />
-        <Route path="/reports/edit/:id" element={<ProtectedRoute><Layout><Reportform /></Layout></ProtectedRoute>} />
+        <Route path="/reports/edit/:id" element={<ProtectedRoute><Layout><ReportForm /></Layout></ProtectedRoute>} />
         <Route path="/reports/:id" element={<ProtectedRoute><Layout><ReportDetail /></Layout></ProtectedRoute>} />
         <Route path="/validasi" element={<ProtectedRoute><Layout><ReportValidation /></Layout></ProtectedRoute>} />
         <Route path="/download" element={<ProtectedRoute><Layout><Download /></Layout></ProtectedRoute>} />
