@@ -153,46 +153,31 @@ export default function BorrowReturn() {
     );
   };
 
-// === SCAN BARCODE (FIXED) ===
-  const handleToolScan = async (result: string) => {
-    setLoading(true);
-    try {
-      // 1. Bersihkan hasil scan dari spasi/enter
-      const cleanResult = result.trim();
 
-      // 2. Cek apakah hasil scan formatnya UUID?
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanResult);
-
-      let query = supabase
+// === SCAN BARCODE ===
+  const handleToolScan = async (result: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
         .from("tools")
         .select("*")
-        .gt("available_quantity", 0);
+        .or(`barcode_value.eq.${result}, id.eq.${result}`)
+        .gt("available_quantity", 0)
+        .single();
 
-      // 3. Logic Query yang Aman
-      if (isUUID) {
-        // Jika format UUID, kita bisa cek ID ATAU barcode_value (karena barcode bisa saja isinya UUID)
-        query = query.or(`id.eq.${cleanResult},barcode_value.eq.${cleanResult}`);
-      } else {
-        // Jika BUKAN UUID (misal barcode pendek "12345"), JANGAN cek kolom ID supaya tidak error database
-        query = query.eq("barcode_value", cleanResult);
+      if (error || !data) {
+        toast.error("Tool tidak ditemukan atau tidak tersedia");
+        return;
       }
 
-      const { data, error } = await query.single();
-
-      if (error || !data) {
-        toast.error("Tool tidak ditemukan atau stok habis");
-        return;
-      }
-
-      addTool(data);
-      setShowToolScanner(false);
-    } catch (err) {
-      console.error(err);
-      toast.error("Terjadi kesalahan saat memproses data");
-    } finally {
-      setLoading(false);
-    }
-  };
+      addTool(data);
+      setShowToolScanner(false);
+    } catch {
+      toast.error("Gagal membaca barcode");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // === SUBMIT FORM ===
   const handleSubmit = async (e: React.FormEvent) => {
