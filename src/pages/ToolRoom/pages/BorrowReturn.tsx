@@ -154,30 +154,51 @@ export default function BorrowReturn() {
   };
 
 
-// === SCAN BARCODE ===
-  const handleToolScan = async (result: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("tools")
-        .select("*")
-        .or(`barcode_value.eq.${result}, id.eq.${result}`)
-        .gt("available_quantity", 0)
-        .single();
 
-      if (error || !data) {
-        toast.error("Tool tidak ditemukan atau tidak tersedia");
+  // === SCAN BARCODE (FINAL FIX) ===
+  const handleToolScan = async (result: string) => {
+    setLoading(true);
+    try {
+      // 1. Bersihkan hasil scan
+      const cleanResult = result.trim();
+
+      // 2. Cek apakah hasil scan adalah UUID yang valid?
+      // Regex standar untuk UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanResult);
+
+      if (!isUUID) {
+        // Jika yang discan BUKAN UUID (misal barcode pendek), dan kolom barcode_value belum ada
+        // Maka kita kasih alert error saja daripada bikin crash database.
+        toast.error("Format QR tidak dikenali (Bukan UUID).");
+        setLoading(false);
         return;
       }
 
-      addTool(data);
-      setShowToolScanner(false);
-    } catch {
-      toast.error("Gagal membaca barcode");
-    } finally {
-      setLoading(false);
-    }
-  };
+      // 3. Query HANYA ke ID (Karena kolom barcode_value tidak ada)
+      const { data, error } = await supabase
+        .from("tools")
+        .select("*")
+        .eq("id", cleanResult) // <--- Cuma cari di ID
+        .gt("available_quantity", 0)
+        .single();
+
+      if (error || !data) {
+        console.error("Scan Error:", error);
+        toast.error("Tool tidak ditemukan atau stok habis");
+        return;
+      }
+
+      addTool(data);
+      setShowToolScanner(false);
+      toast.success(`Berhasil menambahkan: ${data.name}`);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat memproses scan");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // === SUBMIT FORM ===
   const handleSubmit = async (e: React.FormEvent) => {
