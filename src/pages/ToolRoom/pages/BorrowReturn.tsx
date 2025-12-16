@@ -1,4 +1,5 @@
-//src/pages/ToolRoom/pages/BorrowReturn.tsx
+// src/pages/ToolRoom/pages/BorrowReturn.tsx
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { QrCode, Loader2, Search, X, Plus, Minus } from "lucide-react";
@@ -54,7 +55,14 @@ export default function BorrowReturn() {
     if (currentUser?.role === "admin") {
       fetchEmployees();
     } else {
-      setSelectedEmployee(currentUser || null); // auto set user sendiri
+      // Jika bukan admin, otomatis set peminjam adalah user yang login
+      // Pastikan struktur object Employee sesuai dengan data currentUser dari AuthContext
+      if (currentUser) {
+          // Mapping currentUser ke format Employee jika perlu, atau langsung pakai
+          // Asumsi currentUser punya id, name, register_number
+          // @ts-ignore
+          setSelectedEmployee(currentUser); 
+      }
     }
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -123,16 +131,15 @@ export default function BorrowReturn() {
   };
 
   const addTool = (tool: Tool) => {
-    // Non-admin hanya boleh pinjam 1 alat per transaksi
-    if (currentUser?.role !== "admin" && selectedTools.length >= 1) {
-      toast.error("User hanya dapat meminjam satu alat per transaksi.");
-      return;
-    }
-
+    // --- [LOGIC DIPERBAIKI] ---
+    // Batasan jumlah dihapus. Mekanik boleh pinjam banyak alat.
+    
     if (!selectedTools.some((s) => s.tool.id === tool.id)) {
       setSelectedTools((prev) => [...prev, { tool, quantity: 1 }]);
       clearToolSearch();
       setShowToolDropdown(false);
+    } else {
+        toast("Tool sudah ada di daftar.");
     }
   };
 
@@ -153,52 +160,41 @@ export default function BorrowReturn() {
     );
   };
 
+  // === SCAN BARCODE (FIXED) ===
+  const handleToolScan = async (result: string) => {
+    setLoading(true);
+    try {
+      const cleanResult = result.trim();
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanResult);
 
-
-  // === SCAN BARCODE (FINAL FIX) ===
-  const handleToolScan = async (result: string) => {
-    setLoading(true);
-    try {
-      // 1. Bersihkan hasil scan
-      const cleanResult = result.trim();
-
-      // 2. Cek apakah hasil scan adalah UUID yang valid?
-      // Regex standar untuk UUID
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanResult);
-
-      if (!isUUID) {
-        // Jika yang discan BUKAN UUID (misal barcode pendek), dan kolom barcode_value belum ada
-        // Maka kita kasih alert error saja daripada bikin crash database.
+      if (!isUUID) {
         toast.error("Format QR tidak dikenali (Bukan UUID).");
         setLoading(false);
         return;
       }
 
-      // 3. Query HANYA ke ID (Karena kolom barcode_value tidak ada)
       const { data, error } = await supabase
         .from("tools")
         .select("*")
-        .eq("id", cleanResult) // <--- Cuma cari di ID
+        .eq("id", cleanResult) 
         .gt("available_quantity", 0)
         .single();
 
-      if (error || !data) {
-        console.error("Scan Error:", error);
-        toast.error("Tool tidak ditemukan atau stok habis");
-        return;
-      }
+      if (error || !data) {
+        toast.error("Tool tidak ditemukan atau stok habis");
+        return;
+      }
 
-      addTool(data);
-      setShowToolScanner(false);
+      addTool(data);
+      setShowToolScanner(false);
       toast.success(`Berhasil menambahkan: ${data.name}`);
-
-    } catch (err) {
+    } catch (err) {
       console.error(err);
-      toast.error("Terjadi kesalahan saat memproses scan");
-    } finally {
-      setLoading(false);
-    }
-  };
+      toast.error("Terjadi kesalahan saat scan");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // === SUBMIT FORM ===
   const handleSubmit = async (e: React.FormEvent) => {
@@ -214,21 +210,24 @@ export default function BorrowReturn() {
       for (const s of selectedTools) {
         if (s.quantity > s.tool.available_quantity) {
           toast.error(`Stok ${s.tool.name} tidak cukup`);
+          setLoading(false);
           return;
         }
       }
 
-      // Admin bisa pinjam atas nama siapa saja
-      const borrowerId =
-        currentUser?.role === "admin" ? selectedEmployee.id : currentUser?.id;
+      // --- [LOGIC PEMINJAM] ---
+      // Jika Admin: Bisa pilih employee lain (selectedEmployee.id)
+      // Jika Bukan Admin: Wajib pakai ID sendiri (currentUser.id)
+      const borrowerId = currentUser?.role === "admin" ? selectedEmployee.id : currentUser?.id;
 
       const loanRecords = selectedTools.map((s) => ({
         tool_id: s.tool.id,
-        employee_id: borrowerId,
+        employee_id: borrowerId, // ID Peminjam yang benar
         quantity: s.quantity,
         expected_return_at: expectedReturnDate,
         notes,
         status: "borrowed",
+        created_by: currentUser?.id // Optional: track siapa yang input data
       }));
 
       const { error } = await supabase.from("tool_loans").insert(loanRecords);
@@ -244,12 +243,18 @@ export default function BorrowReturn() {
 
       toast.success("Loan berhasil dibuat");
       setSelectedTools([]);
-      if (currentUser?.role === "admin") setSelectedEmployee(null);
+      
+      // Jika admin, reset pilihan employee. Jika user, tetap diri sendiri.
+      if (currentUser?.role === "admin") {
+          setSelectedEmployee(null);
+      }
+      
       setExpectedReturnDate("");
       setNotes("");
       fetchTools();
-    } catch {
-      toast.error("Gagal membuat loan");
+    } catch (err:any) {
+      console.error(err);
+      toast.error("Gagal membuat loan: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -398,7 +403,7 @@ export default function BorrowReturn() {
       {/* EMPLOYEE SELECTION */}
       {currentUser?.role === "admin" ? (
         <div ref={employeesRef}>
-          <label className="block text-sm font-medium text-gray-700">Employee</label>
+          <label className="block text-sm font-medium text-gray-700">Employee (Borrower)</label>
           <div className="relative mt-1">
             <input
               type="text"
@@ -412,20 +417,24 @@ export default function BorrowReturn() {
               className="block w-full rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500"
             />
             {selectedEmployee ? (
-              <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
-                <p className="font-medium">{selectedEmployee.name}</p>
-                <p className="text-sm text-gray-500">ID: {selectedEmployee.register_number}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedEmployee(null);
-                    setEmployeeSearch("");
-                    setShowEmployeeDropdown(true);
-                  }}
-                  className="mt-2 text-sm text-red-600 hover:text-red-800"
-                >
-                  Clear Selection
-                </button>
+              <div className="mt-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="font-bold text-blue-800">{selectedEmployee.name}</p>
+                        <p className="text-sm text-blue-600">ID: {selectedEmployee.register_number}</p>
+                    </div>
+                    <button
+                    type="button"
+                    onClick={() => {
+                        setSelectedEmployee(null);
+                        setEmployeeSearch("");
+                        setShowEmployeeDropdown(true);
+                    }}
+                    className="text-sm text-red-600 hover:text-red-800 font-medium"
+                    >
+                    Change
+                    </button>
+                </div>
               </div>
             ) : (
               showEmployeeDropdown &&
@@ -451,8 +460,9 @@ export default function BorrowReturn() {
         </div>
       ) : (
         <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-          <p className="font-medium">{currentUser?.name}</p>
-          <p className="text-sm text-gray-500">ID: {currentUser?.register_number}</p>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Borrower</label>
+          <p className="font-medium text-gray-900">{currentUser?.name || "Loading..."}</p>
+          <p className="text-sm text-gray-500">ID: {currentUser?.register_number || "-"}</p>
         </div>
       )}
 
