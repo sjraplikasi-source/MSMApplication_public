@@ -76,10 +76,17 @@ const PRIORITY_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#6B7280'];
 export default function App() {
   const navigate = useNavigate();
   const dashboardRef = useRef(null);
+  
+  // State Filter Waktu
   const [dateRange, setDateRange] = useState('this_year');
+  // State untuk Custom Date (Default awal bulan ini s/d hari ini)
+  const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Data States
   const [kpiData, setKpiData] = useState<KpiData>({ totalOpen: 0, waitingValidation: 0, waitingReview: 0, waitingSupply: 0, siapDikerjakan: 0 });
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [equipmentData, setEquipmentData] = useState<EquipmentData[]>([]);
@@ -92,14 +99,22 @@ export default function App() {
       setLoading(true);
       const now = new Date();
       let startDate, endDate;
+
+      // Logika Penentuan Tanggal
       switch(dateRange) {
         case 'last_7_days': startDate = format(subDays(now, 7), 'yyyy-MM-dd'); endDate = format(now, 'yyyy-MM-dd'); break;
         case 'last_30_days': startDate = format(subDays(now, 30), 'yyyy-MM-dd'); endDate = format(now, 'yyyy-MM-dd'); break;
         case 'this_month': startDate = format(startOfMonth(now), 'yyyy-MM-dd'); endDate = format(endOfMonth(now), 'yyyy-MM-dd'); break;
-        case 'this_year': default: startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
+        case 'this_year': startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
+        // Case Baru: Custom
+        case 'custom': 
+            startDate = customStartDate; 
+            endDate = customEndDate; 
+            break;
+        default: startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
       }
 
-      // --- PERBAIKAN 1: Tambahkan 'estimated_ready_date' di select query ---
+      // Query ke Supabase
       const { data, error } = await supabase
         .from('backlogs')
         .select('*, backlog_spareparts(stock_status, estimated_ready_date)', { count: 'exact' })
@@ -129,23 +144,16 @@ export default function App() {
       const waitingValidation = openBacklogs.filter(b => b.status === 'draft').length;
       const waitingReview = openBacklogs.filter(b => b.status === 'validated').length;
       
-      // --- PERBAIKAN 2: Logika Menunggu Supply (Include Overdue) ---
+      // Logika Menunggu Supply (Include Overdue)
       const waitingSupply = openBacklogs.filter(b => {
-          // Hanya backlog 'reviewed' yang butuh sparepart
           if (b.status !== 'reviewed' || !b.need_sparepart) return false;
-
-          // Kondisi 1: Belum pernah diupdate SM (NULL)
-          if (!b.supply_updated_at) return true;
-
-          // Kondisi 2: Sudah update, TAPI estimasinya sudah lewat (Overdue)
+          if (!b.supply_updated_at) return true; // Belum pernah diupdate
           const parts = b.backlog_spareparts || [];
           const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset jam agar banding tanggal saja
-
+          today.setHours(0, 0, 0, 0); 
           const hasOverdue = parts.some((p: any) => 
             p.estimated_ready_date && new Date(p.estimated_ready_date) < today
           );
-
           return hasOverdue;
       }).length;
       
@@ -206,7 +214,7 @@ export default function App() {
       setLoading(false);
     };
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, customStartDate, customEndDate]); // Trigger ulang saat tanggal custom berubah
 
   const handleDownloadImage = async () => {
     if (!dashboardRef.current) return;
@@ -243,18 +251,43 @@ export default function App() {
           <p className="text-sm text-gray-500">Ringkasan status dan tren backlog pemeliharaan.</p>
         </div>
         <div className="flex items-center gap-4 mt-4 sm:mt-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 <Filter size={16} className="text-gray-500" />
-                <select className="border rounded-md px-3 py-1.5 text-sm bg-white" value={dateRange} onChange={e => setDateRange(e.target.value)}>
+                <select 
+                    className="border rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    value={dateRange} 
+                    onChange={e => setDateRange(e.target.value)}
+                >
                     <option value="this_year">Tahun Ini</option>
                     <option value="this_month">Bulan Ini</option>
                     <option value="last_30_days">30 Hari Terakhir</option>
                     <option value="last_7_days">7 Hari Terakhir</option>
+                    <option value="custom">Custom Range</option>
                 </select>
+
+                {/* Input Tanggal Muncul Jika Custom Dipilih */}
+                {dateRange === 'custom' && (
+                    <div className="flex items-center gap-2 animate-fadeIn">
+                        <input 
+                            type="date" 
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className="border rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-400">-</span>
+                        <input 
+                            type="date" 
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className="border rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                )}
             </div>
+            
             <button onClick={handleDownloadImage} disabled={isDownloading || loading} className="flex items-center gap-2 border rounded-md px-3 py-1.5 text-sm bg-white hover:bg-gray-50 disabled:opacity-50">
               <Download size={16} />
-              <span>{isDownloading ? 'Downloading...' : 'Download'}</span>
+              <span className="hidden sm:inline">{isDownloading ? 'Downloading...' : 'Download'}</span>
             </button>
         </div>
       </div>
@@ -266,17 +299,7 @@ export default function App() {
             <KpiCard title="Total Backlog Open" value={kpiData.totalOpen} description="Semua status kecuali Closed & Rejected" icon={Wrench} color="text-gray-500" onClick={() => navigate('/Backlog/list?status=open')} />
             <KpiCard title="Menunggu Validasi" value={kpiData.waitingValidation} description="Status 'draft'" icon={AlertTriangle} color="text-red-500" onClick={() => navigate('/Backlog/list?status=draft')} />
             <KpiCard title="Menunggu Review" value={kpiData.waitingReview} description="Status 'validated'" icon={Clock} color="text-yellow-500" onClick={() => navigate('/Backlog/list?status=validated')} />
-            
-            {/* LINK INI SUDAH DISESUAIKAN DENGAN FILTER SUPPLY LIST YANG BARU */}
-            <KpiCard 
-                title="Menunggu Update SM" 
-                value={kpiData.waitingSupply} 
-                description="Pending & Overdue Estimasi" 
-                icon={Clock} 
-                color="text-purple-500" 
-                onClick={() => navigate('/supply/backlog?smFilter=action_required')} 
-            />
-            
+            <KpiCard title="Menunggu Update SM" value={kpiData.waitingSupply} description="Pending & Overdue Estimasi" icon={Clock} color="text-purple-500" onClick={() => navigate('/supply/backlog?smFilter=action_required')} />
             <KpiCard title="Siap Dikerjakan" value={kpiData.siapDikerjakan} description="Part ready & tidak butuh shutdown" icon={CheckCircle} color="text-green-500" onClick={() => navigate('/Backlog/list?part_status=complete&need_shutdown=false')} />
           </div>
 
