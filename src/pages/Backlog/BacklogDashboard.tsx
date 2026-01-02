@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Filter, Download, Wrench, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from 'date-fns';
 
 // Deklarasikan html2canvas
 declare const html2canvas: any;
@@ -19,6 +19,7 @@ type KpiData = {
   waitingSupply: number;
   siapDikerjakan: number;
 };
+// Update: month string akan berisi "Jan 25", "Feb 26", dst.
 type MonthlyData = { month: string; created: number; closed: number };
 type EquipmentData = { name: string; value: number };
 type PartStatusData = { name: string; value: number };
@@ -45,7 +46,7 @@ const KpiCard = ({ title, value, description, icon: Icon, color, onClick }: any)
 const ChartContainer = ({ title, children, isLoading }: any) => (
   <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
     <h3 className="text-md font-semibold text-gray-700 mb-4">{title}</h3>
-    <div style={{ width: '100%', height: 300 }}>
+    <div style={{ width: '100%', height: 350 }}> {/* Sedikit dipertinggi agar label miring muat */}
       {isLoading ? <div className="flex justify-center items-center h-full text-gray-500">Memuat data...</div> : children}
     </div>
   </div>
@@ -79,8 +80,8 @@ export default function App() {
   
   // State Filter Waktu
   const [dateRange, setDateRange] = useState('this_year');
-  // State untuk Custom Date (Default awal bulan ini s/d hari ini)
-  const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  // State Custom Date (Default: Awal Tahun Ini s/d Hari Ini)
+  const [customStartDate, setCustomStartDate] = useState(format(startOfYear(new Date()), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const [loading, setLoading] = useState(true);
@@ -100,13 +101,12 @@ export default function App() {
       const now = new Date();
       let startDate, endDate;
 
-      // Logika Penentuan Tanggal
+      // 1. Tentukan Range Tanggal
       switch(dateRange) {
         case 'last_7_days': startDate = format(subDays(now, 7), 'yyyy-MM-dd'); endDate = format(now, 'yyyy-MM-dd'); break;
         case 'last_30_days': startDate = format(subDays(now, 30), 'yyyy-MM-dd'); endDate = format(now, 'yyyy-MM-dd'); break;
         case 'this_month': startDate = format(startOfMonth(now), 'yyyy-MM-dd'); endDate = format(endOfMonth(now), 'yyyy-MM-dd'); break;
         case 'this_year': startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
-        // Case Baru: Custom
         case 'custom': 
             startDate = customStartDate; 
             endDate = customEndDate; 
@@ -114,7 +114,7 @@ export default function App() {
         default: startDate = format(startOfYear(now), 'yyyy-MM-dd'); endDate = format(endOfYear(now), 'yyyy-MM-dd'); break;
       }
 
-      // Query ke Supabase
+      // 2. Query Supabase
       const { data, error } = await supabase
         .from('backlogs')
         .select('*, backlog_spareparts(stock_status, estimated_ready_date)', { count: 'exact' })
@@ -123,9 +123,52 @@ export default function App() {
         
       if (error) { console.error("Error fetching data:", error); setLoading(false); return; }
 
+      // --- LOGIC CHART BULANAN (CROSS-YEAR SUPPORT) ---
+      const monthlyMap = new Map<string, { created: number; closed: number; label: string }>();
+      
+      try {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        // Cek validasi tanggal agar tidak crash
+        if (start <= end) {
+            // Generate setiap bulan dalam interval (misal: Des 2025, Jan 2026, Feb 2026)
+            const interval = eachMonthOfInterval({ start, end });
+            
+            interval.forEach(date => {
+                const key = format(date, 'yyyy-MM'); // Key unik: 2025-12, 2026-01
+                const label = format(date, 'MMM yy'); // Label UI: Des 25, Jan 26
+                monthlyMap.set(key, { created: 0, closed: 0, label });
+            });
+        }
+      } catch (e) {
+          console.error("Invalid date range for chart generation");
+      }
+
+      // Isi data ke dalam Map
+      data.forEach(b => {
+        const date = new Date(b.created_at);
+        const key = format(date, 'yyyy-MM');
+        
+        if (monthlyMap.has(key)) {
+            monthlyMap.get(key)!.created++;
+            if (b.status === 'closed') {
+                monthlyMap.get(key)!.closed++;
+            }
+        }
+      });
+      
+      // Convert Map ke Array untuk Recharts
+      setMonthlyData(Array.from(monthlyMap.values()).map(v => ({
+          month: v.label, // Ini akan jadi X-Axis (Jan 25, Feb 26)
+          created: v.created,
+          closed: v.closed
+      })));
+
+
+      // --- LOGIC KPI & LAINNYA (SAMA SEPERTI SEBELUMNYA) ---
       const openBacklogs = data.filter(b => b.status !== 'closed' && b.status !== 'rejected');
 
-      // --- Hitung Prioritas ---
       const priorityCounts = openBacklogs.reduce((acc, backlog) => {
         const priority = backlog.priority || 'Improve';
         acc[priority] = (acc[priority] || 0) + 1;
@@ -144,10 +187,9 @@ export default function App() {
       const waitingValidation = openBacklogs.filter(b => b.status === 'draft').length;
       const waitingReview = openBacklogs.filter(b => b.status === 'validated').length;
       
-      // Logika Menunggu Supply (Include Overdue)
       const waitingSupply = openBacklogs.filter(b => {
           if (b.status !== 'reviewed' || !b.need_sparepart) return false;
-          if (!b.supply_updated_at) return true; // Belum pernah diupdate
+          if (!b.supply_updated_at) return true; 
           const parts = b.backlog_spareparts || [];
           const today = new Date();
           today.setHours(0, 0, 0, 0); 
@@ -199,14 +241,6 @@ export default function App() {
         { name: 'Butuh Manpower Extra', value: needManpowerCount, filterKey: 'need_manpower', filterValue: 'true' },
       ]);
 
-      const monthlyMap = new Map<string, { created: number; closed: number }>();
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-      monthNames.forEach(m => monthlyMap.set(m, { created: 0, closed: 0 }));
-      data.forEach(b => {
-        const month = monthNames[new Date(b.created_at).getMonth()];
-        if (monthlyMap.has(month)) { monthlyMap.get(month)!.created++; if (b.status === 'closed') { monthlyMap.get(month)!.closed++; } }
-      });
-      setMonthlyData(Array.from(monthlyMap.entries()).map(([month, values]) => ({ month, ...values })));
       const equipmentMap = new Map<string, number>();
       openBacklogs.forEach(b => { equipmentMap.set(b.unit_code, (equipmentMap.get(b.unit_code) || 0) + 1); });
       setEquipmentData(Array.from(equipmentMap.entries()).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10));
@@ -214,7 +248,7 @@ export default function App() {
       setLoading(false);
     };
     fetchData();
-  }, [dateRange, customStartDate, customEndDate]); // Trigger ulang saat tanggal custom berubah
+  }, [dateRange, customStartDate, customEndDate]); 
 
   const handleDownloadImage = async () => {
     if (!dashboardRef.current) return;
@@ -265,7 +299,6 @@ export default function App() {
                     <option value="custom">Custom Range</option>
                 </select>
 
-                {/* Input Tanggal Muncul Jika Custom Dipilih */}
                 {dateRange === 'custom' && (
                     <div className="flex items-center gap-2 animate-fadeIn">
                         <input 
@@ -304,9 +337,27 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <ChartContainer title="Tren Backlog Bulanan" isLoading={loading}>
-              <ResponsiveContainer><LineChart data={monthlyData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" fontSize={12} /><YAxis fontSize={12} /><Tooltip /><Legend /><Line type="monotone" dataKey="created" name="Created" stroke="#8884d8" strokeWidth={2} /><Line type="monotone" dataKey="closed" name="Closed" stroke="#82ca9d" strokeWidth={2} /></LineChart></ResponsiveContainer>
+            <ChartContainer title="Tren Backlog (Created vs Closed)" isLoading={loading}>
+              <ResponsiveContainer>
+                <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                        dataKey="month" 
+                        fontSize={11} 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={50} // Beri ruang untuk teks miring
+                        interval={0} // Paksa tampil semua label jika muat
+                    />
+                    <YAxis fontSize={12} />
+                    <Tooltip />
+                    <Legend verticalAlign="top" height={36} />
+                    <Line type="monotone" dataKey="created" name="Created" stroke="#8884d8" strokeWidth={2} />
+                    <Line type="monotone" dataKey="closed" name="Closed" stroke="#82ca9d" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
             </ChartContainer>
+
             <ChartContainer title="Top 10 Equipment Backlog Open" isLoading={loading}>
               <ResponsiveContainer><BarChart data={equipmentData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" fontSize={12} /><YAxis type="category" dataKey="name" width={80} fontSize={12} interval={0} /><Tooltip /><Bar dataKey="value" name="Jumlah Backlog" fill="#3b82f6" /></BarChart></ResponsiveContainer>
             </ChartContainer>
