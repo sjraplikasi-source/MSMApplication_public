@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 // Types
 interface Equipment {
   id: string;
+  code: string;
   name: string;
   type: string;
   model: string;
@@ -118,6 +119,7 @@ export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // Transform the data to match the Equipment interface
       const transformedData = data.map(item => ({
         id: item.id,
+        code: item.code,
         name: item.name,
         type: item.type,
         model: item.model,
@@ -201,6 +203,7 @@ const fetchMaintenanceSettings = async () => {
       const { error } = await supabase
         .from('equipment')
         .insert([{
+          code: newEquipment.code,
           name: newEquipment.name,
           type: newEquipment.type,
           model: newEquipment.model,
