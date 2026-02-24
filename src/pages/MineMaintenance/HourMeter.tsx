@@ -1,6 +1,7 @@
 // src/pages/MineMaintenance/HourMeter
+
 import React, { useState, useEffect } from 'react';
-import { Clock, ArrowUp, Search, Calendar, Download } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { useMaintenanceContext } from '@/context/MaintenanceContext';
 import HourMeterUpdateModal from '@/components/mine/modals/HourMeterUpdateModal';
 import * as XLSX from 'xlsx';
@@ -33,23 +34,20 @@ const HourMeter: React.FC = () => {
   useEffect(() => {
     const loadHourMeterReadings = async () => {
       const readings: Record<string, HourMeterReading[]> = {};
+
       for (const unit of equipment) {
         readings[unit.id] = await getHourMeterReadings(unit.id);
       }
+
       setHourMeterReadings(readings);
     };
 
     loadHourMeterReadings();
   }, [equipment, getHourMeterReadings]);
 
-  const handleOpenUpdateModal = (unit: any) => {
-    setSelectedEquipment(unit);
-    setIsUpdateModalOpen(true);
-  };
-
-  const sortedEquipment = [...filteredEquipment].sort((a, b) => {
-    return (b.hourMeter || 0) - (a.hourMeter || 0);
-  });
+  const sortedEquipment = [...filteredEquipment].sort(
+    (a, b) => (b.hourMeter || 0) - (a.hourMeter || 0)
+  );
 
   const calculateAverageHours = (equipmentId: string) => {
     const readings = hourMeterReadings[equipmentId];
@@ -61,6 +59,7 @@ const HourMeter: React.FC = () => {
     );
 
     const delta = sorted[sorted.length - 1].hours - sorted[0].hours;
+
     const days = Math.max(
       1,
       Math.round(
@@ -84,9 +83,14 @@ const HourMeter: React.FC = () => {
     setExpandedEquipment(expandedEquipment === equipmentId ? null : equipmentId);
   };
 
+  const handleOpenUpdateModal = (unit: any) => {
+    setSelectedEquipment(unit);
+    setIsUpdateModalOpen(true);
+  };
+
   const exportToExcel = () => {
     const summaryData = equipment.map(unit => ({
-      Equipment: unit.name,
+      Equipment: unit.code + ' - ' + unit.name,
       Model: unit.model,
       'Serial Number': unit.serialNumber,
       'Current Hours': unit.hourMeter,
@@ -97,6 +101,7 @@ const HourMeter: React.FC = () => {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(summaryData);
+
     XLSX.utils.book_append_sheet(wb, ws, 'Summary');
     XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
   };
@@ -106,49 +111,42 @@ const HourMeter: React.FC = () => {
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
-  <h1 className="text-2xl font-bold text-gray-800">Hour Meter Updates</h1>
+        <h1 className="text-2xl font-bold text-gray-800">
+          Hour Meter Updates
+        </h1>
 
-  <div className="flex gap-2">
+        <div className="flex gap-2">
 
-    <button
-      onClick={() => setViewMode('grid')}
-      className={`px-3 py-1 text-sm rounded border ${
-        viewMode === 'grid'
-          ? 'bg-blue-600 text-white border-blue-600'
-          : 'bg-white'
-      }`}
-    >
-      Grid
-    </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`px-3 py-1 text-sm rounded border ${
+              viewMode === 'grid'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white'
+            }`}
+          >
+            Grid
+          </button>
 
-    <button
-      onClick={() => setViewMode('list')}
-      className={`px-3 py-1 text-sm rounded border ${
-        viewMode === 'list'
-          ? 'bg-blue-600 text-white border-blue-600'
-          : 'bg-white'
-      }`}
-    >
-      List
-    </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-3 py-1 text-sm rounded border ${
+              viewMode === 'list'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white'
+            }`}
+          >
+            List
+          </button>
 
-    <button
-      onClick={exportToExcel}
-      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-    >
-      <Download size={18} className="mr-2" /> Export
-    </button>
+          <button
+            onClick={exportToExcel}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            <Download size={18} className="mr-2" /> Export
+          </button>
 
-  </div>
-</div>
-        <h1 className="text-2xl font-bold text-gray-800">Hour Meter Updates</h1>
-
-        <button
-          onClick={exportToExcel}
-          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-        >
-          <Download size={18} className="mr-2" /> Export
-        </button>
+        </div>
       </div>
 
       {/* SEARCH */}
@@ -165,92 +163,16 @@ const HourMeter: React.FC = () => {
         </div>
       </div>
 
-      {/* GRID */}
+      {/* CONTENT */}
       {sortedEquipment.length === 0 ? (
         <div className="text-center py-10 text-gray-500">
           No equipment found
         </div>
-      ) : (
-       {viewMode === 'grid' ? (
+      ) : viewMode === 'grid' ? (
 
-  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    {sortedEquipment.map(unit => {
-) : (
-
-  <div className="space-y-3">
-    {sortedEquipment.map(unit => {
-
-      const avg = unit.useAutoCalculation
-        ? calculateAverageHours(unit.id)
-        : unit.averageHoursPerDay || 0;
-
-      const statusColor = getStatusColor(unit.hourMeter || 0, avg);
-
-      return (
-        <div key={unit.id} className="bg-white border rounded-lg p-4">
-
-          <div className="flex justify-between items-center">
-
-            <div>
-              <div className="font-semibold">
-                {unit.code} • {unit.name}
-              </div>
-              <div className="text-xs text-gray-500">
-                {unit.model} • S/N: {unit.serialNumber}
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div className={`text-lg font-bold ${statusColor}`}>
-                {unit.hourMeter || 0} h
-              </div>
-              <div className="text-xs text-gray-500">
-                Avg : {avg}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => toggleHistory(unit.id)}
-                className="text-xs border rounded px-2 py-1"
-              >
-                History
-              </button>
-
-              <button
-                onClick={() => handleOpenUpdateModal(unit)}
-                className="text-xs bg-blue-600 text-white rounded px-2 py-1"
-              >
-                Update
-              </button>
-            </div>
-
-          </div>
-
-          {expandedEquipment === unit.id && (
-            <div className="mt-3 border-t pt-2 text-xs">
-              {!hourMeterReadings[unit.id]?.length ? (
-                <div className="text-gray-400">No history</div>
-              ) : (
-                hourMeterReadings[unit.id]
-                  .slice(0, 5)
-                  .map(r => (
-                    <div key={r.id} className="flex justify-between">
-                      <span>{new Date(r.readingDate).toLocaleDateString()}</span>
-                      <span>{r.hours} h</span>
-                    </div>
-                  ))
-              )}
-            </div>
-          )}
-
-        </div>
-      );
-    })}
-  </div>
-
-)}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {sortedEquipment.map(unit => {
+
             const avg = unit.useAutoCalculation
               ? calculateAverageHours(unit.id)
               : unit.averageHoursPerDay || 0;
@@ -258,15 +180,80 @@ const HourMeter: React.FC = () => {
             const statusColor = getStatusColor(unit.hourMeter || 0, avg);
 
             return (
-              <div
-                key={unit.id}
-                className="bg-white rounded-lg shadow-sm border hover:shadow-md transition"
-              >
-                <div className="p-4 space-y-3">
+              <div key={unit.id} className="bg-white rounded-lg shadow-sm border">
 
-                  {/* TITLE */}
+                <div className="p-4 space-y-2">
+
+                  <div className="font-semibold">
+                    {unit.code} • {unit.name}
+                  </div>
+
+                  <div className={`text-2xl font-bold ${statusColor}`}>
+                    {unit.hourMeter || 0} h
+                  </div>
+
+                  <div className="text-xs text-gray-500">
+                    Avg / Day : {avg}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => toggleHistory(unit.id)}
+                      className="flex-1 text-xs border rounded py-1"
+                    >
+                      History
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenUpdateModal(unit)}
+                      className="flex-1 text-xs bg-blue-600 text-white rounded py-1"
+                    >
+                      Update
+                    </button>
+                  </div>
+
+                </div>
+
+                {expandedEquipment === unit.id && (
+                  <div className="border-t p-3 text-xs">
+                    {!hourMeterReadings[unit.id]?.length ? (
+                      <div className="text-gray-400">No history</div>
+                    ) : (
+                      hourMeterReadings[unit.id]
+                        .slice(0, 5)
+                        .map(r => (
+                          <div key={r.id} className="flex justify-between">
+                            <span>{new Date(r.readingDate).toLocaleDateString()}</span>
+                            <span>{r.hours} h</span>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+
+              </div>
+            );
+          })}
+        </div>
+
+      ) : (
+
+        <div className="space-y-3">
+          {sortedEquipment.map(unit => {
+
+            const avg = unit.useAutoCalculation
+              ? calculateAverageHours(unit.id)
+              : unit.averageHoursPerDay || 0;
+
+            const statusColor = getStatusColor(unit.hourMeter || 0, avg);
+
+            return (
+              <div key={unit.id} className="bg-white border rounded-lg p-4">
+
+                <div className="flex justify-between items-center">
+
                   <div>
-                    <div className="font-semibold text-gray-900">
+                    <div className="font-semibold">
                       {unit.code} • {unit.name}
                     </div>
                     <div className="text-xs text-gray-500">
@@ -274,60 +261,50 @@ const HourMeter: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* HOURS */}
-                  <div className={`text-2xl font-bold ${statusColor}`}>
+                  <div className={`text-lg font-bold ${statusColor}`}>
                     {unit.hourMeter || 0} h
                   </div>
 
-                  {/* AVG */}
-                  <div className="text-sm text-gray-600">
-                    Avg / Day : <span className="font-medium">{avg}</span>
-                  </div>
-
-                  {/* ACTIONS */}
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => toggleHistory(unit.id)}
-                      className="flex-1 text-xs border rounded py-1 hover:bg-gray-50"
+                      className="text-xs border rounded px-2 py-1"
                     >
                       History
                     </button>
 
                     <button
                       onClick={() => handleOpenUpdateModal(unit)}
-                      className="flex-1 text-xs bg-blue-600 text-white rounded py-1 hover:bg-blue-700 flex justify-center items-center gap-1"
+                      className="text-xs bg-blue-600 text-white rounded px-2 py-1"
                     >
-                      <ArrowUp size={12} /> Update
+                      Update
                     </button>
                   </div>
+
                 </div>
 
-                {/* HISTORY */}
                 {expandedEquipment === unit.id && (
-                  <div className="border-t p-3 text-sm">
+                  <div className="mt-2 border-t pt-2 text-xs">
                     {!hourMeterReadings[unit.id]?.length ? (
-                      <div className="text-gray-400 text-xs">
-                        No history available
-                      </div>
+                      <div className="text-gray-400">No history</div>
                     ) : (
-                      <div className="space-y-1">
-                        {[...hourMeterReadings[unit.id]]
-                          .sort((a, b) => new Date(b.readingDate).getTime() - new Date(a.readingDate).getTime())
-                          .slice(0, 5)
-                          .map(reading => (
-                            <div key={reading.id} className="flex justify-between text-xs">
-                              <span>{new Date(reading.readingDate).toLocaleDateString()}</span>
-                              <span>{reading.hours} h</span>
-                            </div>
-                          ))}
-                      </div>
+                      hourMeterReadings[unit.id]
+                        .slice(0, 5)
+                        .map(r => (
+                          <div key={r.id} className="flex justify-between">
+                            <span>{new Date(r.readingDate).toLocaleDateString()}</span>
+                            <span>{r.hours} h</span>
+                          </div>
+                        ))
                     )}
                   </div>
                 )}
+
               </div>
             );
           })}
         </div>
+
       )}
 
       {/* MODAL */}
@@ -341,6 +318,7 @@ const HourMeter: React.FC = () => {
           equipment={selectedEquipment}
         />
       )}
+
     </div>
   );
 };
