@@ -18,6 +18,10 @@ const ReportForm = () => {
   const [masters, setMasters] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ✅ HM CONTROL
+const [lastHM, setLastHM] = useState<number | null>(null);
+const [hmWarning, setHmWarning] = useState<string | null>(null);
+const [hmDelta, setHmDelta] = useState<number | null>(null);
 
   // Inisialisasi form kosong
   const emptyForm = {
@@ -145,6 +149,62 @@ const ReportForm = () => {
     loadMasters();
   }, [user]);
 
+  // ✅ FETCH LAST HM
+const fetchLastHM = async (equipmentId: string) => {
+
+  if (!equipmentId) {
+    setLastHM(null);
+    return;
+  }
+
+  const { data } = await supabase
+    .from("hour_meter_readings")
+    .select("hours, reading_date")
+    .eq("equipment_id", equipmentId)
+    .order("reading_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (data) setLastHM(Number(data.hours));
+  else setLastHM(null);
+};
+
+  // ✅ LOAD LAST HM SAAT EQUIPMENT CHANGE
+useEffect(() => {
+  if (form.equipment_id) {
+    fetchLastHM(form.equipment_id);
+  }
+}, [form.equipment_id]);
+
+  // ✅ HM VALIDATION
+useEffect(() => {
+
+  if (!form.hour_meter || lastHM === null) {
+    setHmWarning(null);
+    setHmDelta(null);
+    return;
+  }
+
+  const hmValue = Number(form.hour_meter);
+  if (isNaN(hmValue)) return;
+
+  const delta = hmValue - lastHM;
+  setHmDelta(delta);
+
+  if (hmValue < lastHM) {
+    setHmWarning("HM lebih kecil dari reading terakhir");
+    return;
+  }
+
+  if (delta > 24) {
+    setHmWarning(`Delta HM (${delta} jam) melebihi batas 24 jam`);
+    return;
+  }
+
+  setHmWarning(null);
+
+}, [form.hour_meter, lastHM]);
+  
   // Handle Perubahan Input
   const handleChange = (field: string, value: any) => {
     setForm((prevForm: any) => {
@@ -174,9 +234,15 @@ const ReportForm = () => {
 
   // --- FUNGSI 1: STANDARD SUBMIT (Simpan Draft / Create New) ---
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  e.preventDefault();
+
+  if (!isHMValid) {
+    setError("Periksa nilai Hour Meter");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
 
     const { manpower_ids, ...payload } = form;
     const cleanedPayload = {
@@ -224,6 +290,28 @@ const ReportForm = () => {
       return;
     }
 
+    // ✅ UPSERT HM
+if (form.hour_meter && form.equipment_id && form.start_date) {
+
+  const hmValue = Number(form.hour_meter);
+
+  const { error: hmError } = await supabase
+    .from("hour_meter_readings")
+    .upsert([
+      {
+        equipment_id: form.equipment_id,
+        reading_date: form.start_date,
+        hours: hmValue,
+      }
+    ], {
+      onConflict: "equipment_id,reading_date"
+    });
+
+  if (hmError) {
+    console.warn("HM rejected:", hmError.message);
+  }
+}
+    
     // Clear draft if success create
     if (!isEdit) localStorage.removeItem('unsavedReportForm');
 
@@ -289,6 +377,8 @@ const ReportForm = () => {
       }
   };
 
+  const isHMValid = !hmWarning;
+  
   // --- RENDER HELPERS ---
   const renderSearchSelect = (label: string, field: string, source: string, showCode = false) => {
     const options = (masters[source] || []).map((item: any) => ({
@@ -383,6 +473,23 @@ const ReportForm = () => {
         <div className="w-full">
             <label className="block text-sm mb-1">Hour Meter</label>
             <input type="number" className="border px-3 py-2 w-full rounded" value={form.hour_meter} onChange={(e) => handleChange('hour_meter', e.target.value)} placeholder="Angka..." />
+          {lastHM !== null && (
+  <div className="text-xs text-gray-500 mt-1">
+    Last HM : {lastHM.toLocaleString()}
+  </div>
+)}
+
+{hmDelta !== null && (
+  <div className="text-xs text-gray-600">
+    Delta : {hmDelta} jam
+  </div>
+)}
+
+{hmWarning && (
+  <div className="text-xs text-red-500 font-medium">
+    🚨 {hmWarning}
+  </div>
+)}
         </div>
         {renderSearchSelect('Shift', 'shift', 'shift_enum')}
         
@@ -420,7 +527,7 @@ const ReportForm = () => {
           <button 
             type="submit" 
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded transition-colors"
-            disabled={loading}
+            disabled={loading || !isHMValid}
           >
             {loading ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Submit Laporan Baru')}
           </button>
