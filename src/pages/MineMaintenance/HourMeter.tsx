@@ -185,7 +185,7 @@ const HourMeter: React.FC = () => {
                 <div className="p-4 space-y-2">
 
                   <div className="font-semibold">
-                    {unit.code} • {unit.name}
+                    {unit.code || unit.equipment_code || '-'} • {unit.name}
                   </div>
 
                   <div className={`text-2xl font-bold ${statusColor}`}>
@@ -254,7 +254,7 @@ const HourMeter: React.FC = () => {
 
                   <div>
                     <div className="font-semibold">
-                      {unit.code} • {unit.name}
+                      {unit.code || unit.equipment_code || '-'} • {unit.name}
                     </div>
                     <div className="text-xs text-gray-500">
                       {unit.model} • S/N: {unit.serialNumber}
