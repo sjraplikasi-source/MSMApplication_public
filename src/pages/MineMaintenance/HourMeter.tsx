@@ -60,14 +60,16 @@ const HourMeter: React.FC = () => {
       const readings = hourMeterReadings[unit.id] || [];
 
       if (!readings.length) {
-        rows.push({
-          Code: unit.code || '-',
-          Equipment: unit.name,
-          Date: '-',
-          Hours: unit.hourMeter || 0
-        });
-        return;
-      }
+  rows.push({
+    Code: unit.code || '-',
+    Equipment: unit.name,
+    Date: unit.lastUpdated 
+      ? new Date(unit.lastUpdated).toLocaleDateString()
+      : 'Never',
+    Hours: unit.hourMeter || 0
+  });
+  return;
+}
 
       readings.forEach(reading => {
         rows.push({
