@@ -54,51 +54,66 @@ const HourMeter: React.FC = () => {
   };
 
   const exportToExcel = async () => {
+  try {
+    const rows: any[] = [];
 
-  const rows: any[] = [];
+    for (const unit of equipment) {
 
-  for (const unit of equipment) {
+      let readings: HourMeterReading[] = [];
 
-    const readings = await getHourMeterReadings(unit.id);
+      try {
+        readings = await getHourMeterReadings(unit.id);
+      } catch (err) {
+        console.error('Reading error:', unit.name, err);
+      }
 
-    if (!readings.length) {
-      rows.push({
-        Code: unit.code || '-',
-        Equipment: unit.name,
-        Date: unit.lastUpdated
-          ? new Date(unit.lastUpdated).toLocaleDateString()
-          : '-',
-        Hours: unit.hourMeter || 0,
-        Source: 'Equipment'
+      if (!readings.length) {
+        rows.push({
+          Code: unit.code || '-',
+          Equipment: unit.name,
+          Date: unit.lastUpdated
+            ? new Date(unit.lastUpdated).toLocaleDateString()
+            : '-',
+          Hours: unit.hourMeter || 0,
+          Source: 'Equipment'
+        });
+        continue;
+      }
+
+      readings.forEach(reading => {
+        rows.push({
+          Code: unit.code || '-',
+          Equipment: unit.name,
+          Date: new Date(reading.readingDate).toLocaleDateString(),
+          Hours: reading.hours,
+          Source: 'Reading'
+        });
       });
-      continue;
     }
 
-    readings.forEach(reading => {
-      rows.push({
-        Code: unit.code || '-',
-        Equipment: unit.name,
-        Date: new Date(reading.readingDate).toLocaleDateString(),
-        Hours: reading.hours,
-        Source: 'Reading'
-      });
-    });
+    if (!rows.length) {
+      console.warn('No rows to export');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    ws['!cols'] = [
+      { wch: 12 },
+      { wch: 35 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 12 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
+
+    XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
+
+  } catch (error) {
+    console.error('EXPORT ERROR:', error);
   }
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  ws['!cols'] = [
-    { wch: 12 },
-    { wch: 35 },
-    { wch: 15 },
-    { wch: 10 },
-    { wch: 12 }
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
-
-  XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
 };
 
   const sortedEquipment = [...filteredEquipment].sort(
