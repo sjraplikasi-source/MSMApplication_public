@@ -89,15 +89,49 @@ const HourMeter: React.FC = () => {
   };
 
   const exportToExcel = () => {
-    const summaryData = equipment.map(unit => ({
-      Equipment: unit.code + ' - ' + unit.name,
-      Model: unit.model,
-      'Serial Number': unit.serialNumber,
-      'Current Hours': unit.hourMeter,
-      'Avg Hours/Day': unit.useAutoCalculation
-        ? calculateAverageHours(unit.id)
-        : unit.averageHoursPerDay || 0,
-    }));
+
+  const rows: any[] = [];
+
+  equipment.forEach(unit => {
+
+    const readings = hourMeterReadings[unit.id] || [];
+
+    if (!readings.length) {
+      rows.push({
+        Code: unit.code || '-',
+        Equipment: unit.name,
+        Date: '-',
+        Hours: unit.hourMeter || 0
+      });
+      return;
+    }
+
+    readings.forEach(reading => {
+      rows.push({
+        Code: unit.code || '-',
+        Equipment: unit.name,
+        Date: new Date(reading.readingDate).toLocaleDateString(),
+        Hours: reading.hours
+      });
+    });
+
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  ws['!cols'] = [
+    { wch: 15 },  // Code
+    { wch: 35 },  // Equipment
+    { wch: 15 },  // Date
+    { wch: 12 }   // Hours
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
+
+  XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
+};
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(summaryData);
