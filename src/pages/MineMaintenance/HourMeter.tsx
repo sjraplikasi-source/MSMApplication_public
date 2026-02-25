@@ -5,6 +5,7 @@ import { Clock, ArrowUp, Search, Download } from 'lucide-react';
 import { useMaintenanceContext } from '@/context/MaintenanceContext';
 import HourMeterUpdateModal from '@/components/mine/modals/HourMeterUpdateModal';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
 interface HourMeterReading {
   id: string;
