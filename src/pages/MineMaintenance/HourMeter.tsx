@@ -53,47 +53,53 @@ const HourMeter: React.FC = () => {
     setExpandedEquipment(expandedEquipment === equipmentId ? null : equipmentId);
   };
 
-  const exportToExcel = () => {
-    const rows: any[] = [];
+  const exportToExcel = async () => {
 
-    equipment.forEach(unit => {
-      const readings = hourMeterReadings[unit.id] || [];
+  const rows: any[] = [];
 
-      if (!readings.length) {
-  rows.push({
-    Code: unit.code || '-',
-    Equipment: unit.name,
-    Date: unit.lastUpdated 
-      ? new Date(unit.lastUpdated).toLocaleDateString()
-      : 'Never',
-    Hours: unit.hourMeter || 0
-  });
-  return;
-}
+  for (const unit of equipment) {
 
-      readings.forEach(reading => {
-        rows.push({
-          Code: unit.code || '-',
-          Equipment: unit.name,
-          Date: new Date(reading.readingDate).toLocaleDateString(),
-          Hours: reading.hours
-        });
+    const readings = await getHourMeterReadings(unit.id);
+
+    if (!readings.length) {
+      rows.push({
+        Code: unit.code || '-',
+        Equipment: unit.name,
+        Date: unit.lastUpdated
+          ? new Date(unit.lastUpdated).toLocaleDateString()
+          : '-',
+        Hours: unit.hourMeter || 0,
+        Source: 'Equipment'
+      });
+      continue;
+    }
+
+    readings.forEach(reading => {
+      rows.push({
+        Code: unit.code || '-',
+        Equipment: unit.name,
+        Date: new Date(reading.readingDate).toLocaleDateString(),
+        Hours: reading.hours,
+        Source: 'Reading'
       });
     });
+  }
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
 
-    ws['!cols'] = [
-      { wch: 15 },
-      { wch: 35 },
-      { wch: 15 },
-      { wch: 12 }
-    ];
+  ws['!cols'] = [
+    { wch: 12 },
+    { wch: 35 },
+    { wch: 15 },
+    { wch: 10 },
+    { wch: 12 }
+  ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
-    XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
-  };
+  XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
+
+  XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
+};
 
   const sortedEquipment = [...filteredEquipment].sort(
     (a, b) => (b.hourMeter || 0) - (a.hourMeter || 0)
