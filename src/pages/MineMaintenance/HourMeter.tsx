@@ -55,17 +55,34 @@ const HourMeter: React.FC = () => {
 
   const exportToExcel = async () => {
   try {
+
+    console.log('EXPORT START');
+
+    /* 1️⃣ Ambil SEMUA readings SEKALI */
+    const { data: allReadings, error } = await supabase
+      .from('hour_meter_readings')
+      .select('*');
+
+    if (error) throw error;
+
+    console.log('TOTAL READINGS:', allReadings.length);
+
+    /* 2️⃣ Mapping by equipment */
+    const readingsMap: Record<string, any[]> = {};
+
+    allReadings.forEach(r => {
+      if (!readingsMap[r.equipment_id]) {
+        readingsMap[r.equipment_id] = [];
+      }
+      readingsMap[r.equipment_id].push(r);
+    });
+
+    /* 3️⃣ Build rows */
     const rows: any[] = [];
 
-    for (const unit of equipment) {
+    equipment.forEach(unit => {
 
-      let readings: HourMeterReading[] = [];
-
-      try {
-        readings = await getHourMeterReadings(unit.id);
-      } catch (err) {
-        console.error('Reading error:', unit.name, err);
-      }
+      const readings = readingsMap[unit.id] || [];
 
       if (!readings.length) {
         rows.push({
@@ -77,25 +94,23 @@ const HourMeter: React.FC = () => {
           Hours: unit.hourMeter || 0,
           Source: 'Equipment'
         });
-        continue;
+        return;
       }
 
       readings.forEach(reading => {
         rows.push({
           Code: unit.code || '-',
           Equipment: unit.name,
-          Date: new Date(reading.readingDate).toLocaleDateString(),
+          Date: new Date(reading.reading_date).toLocaleDateString(),
           Hours: reading.hours,
           Source: 'Reading'
         });
       });
-    }
+    });
 
-    if (!rows.length) {
-      console.warn('No rows to export');
-      return;
-    }
+    console.log('ROWS READY:', rows.length);
 
+    /* 4️⃣ Excel */
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
 
@@ -110,6 +125,8 @@ const HourMeter: React.FC = () => {
     XLSX.utils.book_append_sheet(wb, ws, 'Hour Meter Data');
 
     XLSX.writeFile(wb, 'Hour_Meter_Readings.xlsx');
+
+    console.log('EXPORT DONE');
 
   } catch (error) {
     console.error('EXPORT ERROR:', error);
