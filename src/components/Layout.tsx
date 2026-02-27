@@ -303,7 +303,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <h2 className="text-lg md:text-xl font-semibold text-gray-800">Maintenance & SM</h2>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center"><input className="border rounded-lg px-3 py-1.5 text-sm w-56" placeholder="Search (Ctrl/Cmd + K)" readOnly /></div>
+
             <button className="relative p-2 text-gray-600 hover:text-gray-800" onClick={() => navigate("/notifications")} title="Notifikasi">
               <Bell className="h-5 w-5" />
               {notifCount > 0 && (
