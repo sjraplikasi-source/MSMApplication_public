@@ -1,10 +1,9 @@
 // src/pages/Backlog/BacklogScheduling.tsx
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useMemo } from "react";
 import { supabase } from "../../lib/supabase";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Select from "react-select";
-import { pushNotif } from "../../utils/notif";
 
 type Backlog = {
   id: string;
@@ -12,198 +11,285 @@ type Backlog = {
   unit_code: string;
   problem: string;
   date: string;
+  priority?: "High" | "Medium" | "Low" | "Improve";
 };
 
 type ManpowerOption = { value: string; label: string };
 type ShutdownEventOption = { value: string; label: string };
 
 const BacklogScheduling: React.FC = () => {
-  const [schedulableBacklogs, setSchedulableBacklogs] = useState<Backlog[]>([]);
-  const [shutdownBacklogs, setShutdownBacklogs] = useState<Backlog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'reguler' | 'shutdown'>('reguler');
+  const [backlogs, setBacklogs] = useState<Backlog[]>([]);
+  const [activeTab, setActiveTab] = useState<"reguler" | "shutdown">("reguler");
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState<"date" | "priority">("date");
 
   const [selectedBacklog, setSelectedBacklog] = useState<Backlog | null>(null);
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledDate, setScheduledDate] = useState("");
   const [assignedMechanics, setAssignedMechanics] = useState<ManpowerOption[]>([]);
-  const [executionNotes, setExecutionNotes] = useState('');
   const [mechanicOptions, setMechanicOptions] = useState<ManpowerOption[]>([]);
   const [shutdownEvents, setShutdownEvents] = useState<ShutdownEventOption[]>([]);
   const [selectedShutdown, setSelectedShutdown] = useState<ShutdownEventOption | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      
-      const { data: schedulableData, error: schedulableError } = await supabase
-        .from('backlogs').select('id, registration_code, unit_code, problem, date').eq('status', 'siap_dijadwalkan').order('date', { ascending: true });
-
-      const { data: shutdownData, error: shutdownError } = await supabase
-        .from('backlogs').select('id, registration_code, unit_code, problem, date').eq('status', 'menunggu_shutdown').order('date', { ascending: true });
-
-      const { data: mechanicsData, error: mechanicsError } = await supabase
-        .from("manpower").select("id, name, nrp").order("name", { ascending: true });
-
-      const { data: eventsData, error: eventsError } = await supabase
-        .from("shutdown_events").select("id, title, start_time").eq('status', 'Direncanakan').order("start_time", { ascending: true });
-
-      if (schedulableError || shutdownError || mechanicsError || eventsError) {
-        setError(schedulableError?.message || shutdownError?.message || mechanicsError?.message || eventsError?.message);
-      } else {
-        setSchedulableBacklogs(schedulableData || []);
-        setShutdownBacklogs(shutdownData || []);
-        setMechanicOptions((mechanicsData || []).map((m: any) => ({ value: m.id, label: m.nrp ? `${m.name} / ${m.nrp}` : m.name })));
-        setShutdownEvents((eventsData || []).map((e: any) => ({ value: e.id, label: `${new Date(e.start_time).toLocaleDateString()} - ${e.title}` })));
-      }
-      setLoading(false);
-    };
     fetchData();
   }, []);
 
-  // ❗ Jangan letakkan sebelum hooks lain.
-// Guard tepat sebelum render:
-if (user?.role === "mechanic") {
-  return (
-    <p className="p-4 text-red-600">
-      Akses ditolak. Halaman ini tidak tersedia untuk mekanik.
-    </p>
-  );
-}
+  const fetchData = async () => {
+    const { data } = await supabase
+      .from("backlogs")
+      .select("id, registration_code, unit_code, problem, date, priority, status")
+      .in("status", ["siap_dijadwalkan", "menunggu_shutdown"])
+      .order("date", { ascending: true });
 
-  const openSchedulingModal = (backlog: Backlog) => {
-    setSelectedBacklog(backlog);
-    setScheduledDate(new Date().toISOString().split('T')[0]);
-    setAssignedMechanics([]);
-    setExecutionNotes('');
-    setSelectedShutdown(null);
+    const { data: mechanics } = await supabase
+      .from("manpower")
+      .select("id, name, nrp")
+      .order("name");
+
+    const { data: events } = await supabase
+      .from("shutdown_events")
+      .select("id, title, start_time")
+      .eq("status", "Direncanakan")
+      .order("start_time");
+
+    setBacklogs(data || []);
+
+    setMechanicOptions(
+      (mechanics || []).map((m: any) => ({
+        value: m.id,
+        label: m.nrp ? `${m.name} / ${m.nrp}` : m.name,
+      }))
+    );
+
+    setShutdownEvents(
+      (events || []).map((e: any) => ({
+        value: e.id,
+        label: `${new Date(e.start_time).toLocaleDateString()} - ${e.title}`,
+      }))
+    );
+  };
+
+  if (user?.role === "mechanic") {
+    return <p className="p-4 text-red-600">Akses ditolak.</p>;
+  }
+
+  const filteredBacklogs = useMemo(() => {
+    return backlogs
+      .filter((b) =>
+        activeTab === "reguler"
+          ? true
+          : true
+      )
+      .filter((b) =>
+        b.registration_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        b.unit_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        b.problem.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .filter((b) =>
+        priorityFilter === "ALL" ? true : b.priority === priorityFilter
+      )
+      .sort((a, b) => {
+        if (sortBy === "date") {
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        }
+        const order = { High: 1, Medium: 2, Low: 3, Improve: 4 };
+        return (order[a.priority || "Low"] || 99) - (order[b.priority || "Low"] || 99);
+      });
+  }, [backlogs, searchTerm, priorityFilter, sortBy, activeTab]);
+
+  const kpi = {
+    total: filteredBacklogs.length,
+    high: filteredBacklogs.filter((b) => b.priority === "High").length,
+    overdue: filteredBacklogs.filter(
+      (b) =>
+        Math.floor(
+          (Date.now() - new Date(b.date).getTime()) / (1000 * 60 * 60 * 24)
+        ) > 7
+    ).length,
+  };
+
+  const getPriorityColor = (p?: string) => {
+    switch (p) {
+      case "High":
+        return "bg-red-600";
+      case "Medium":
+        return "bg-yellow-500";
+      case "Low":
+        return "bg-blue-500";
+      default:
+        return "bg-gray-500";
+    }
   };
 
   const handleScheduleSubmit = async () => {
-    if (!selectedBacklog || !scheduledDate || assignedMechanics.length === 0 || (activeTab === 'shutdown' && !selectedShutdown)) {
-        alert("Semua field wajib diisi: Tanggal, Mekanik, dan Event Shutdown (jika perlu).");
-        return;
+    if (!selectedBacklog || !scheduledDate || assignedMechanics.length === 0) {
+      alert("Tanggal & Mekanik wajib diisi.");
+      return;
     }
+
     setIsSaving(true);
-    
-    try {
-        await supabase
-            .from('backlogs')
-            .update({
-                status: 'dijadwalkan',
-                scheduled_date: scheduledDate,
-                execution_notes: executionNotes,
-                scheduled_by: user?.id,
-                scheduled_at: new Date().toISOString(),
-                shutdown_event_id: selectedShutdown?.value || null,
-            })
-            .eq('id', selectedBacklog.id);
 
-        await supabase.from('backlog_assignments').delete().eq('backlog_id', selectedBacklog.id);
+    await supabase
+      .from("backlogs")
+      .update({
+        status: "dijadwalkan",
+        scheduled_date: scheduledDate,
+        scheduled_by: user?.id,
+        scheduled_at: new Date().toISOString(),
+        shutdown_event_id: selectedShutdown?.value || null,
+      })
+      .eq("id", selectedBacklog.id);
 
-        const assignments = assignedMechanics.map(m => ({
-            backlog_id: selectedBacklog.id,
-            manpower_id: m.value,
-        }));
-        await supabase.from('backlog_assignments').insert(assignments);
+    const assignments = assignedMechanics.map((m) => ({
+      backlog_id: selectedBacklog.id,
+      manpower_id: m.value,
+    }));
 
-       // alert('Backlog berhasil dijadwalkan!');
-        // Hapus dari list di UI
-        if(activeTab === 'reguler') {
-            setSchedulableBacklogs(prev => prev.filter(b => b.id !== selectedBacklog!.id));
-        } else {
-            setShutdownBacklogs(prev => prev.filter(b => b.id !== selectedBacklog!.id));
-        }
-        setSelectedBacklog(null);
-        
-        // Kirim notifikasi
-    } catch (error: any) {
-        alert(`Gagal menyimpan jadwal: ${error.message}`);
-    } finally {
-        setIsSaving(false);
-    }
+    await supabase.from("backlog_assignments").delete().eq("backlog_id", selectedBacklog.id);
+    await supabase.from("backlog_assignments").insert(assignments);
+
+    setSelectedBacklog(null);
+    fetchData();
+    setIsSaving(false);
   };
 
-  if (loading) return <div className="p-4">Memuat data...</div>;
-  if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
-
-  const currentList = activeTab === 'reguler' ? schedulableBacklogs : shutdownBacklogs;
-
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h2 className="text-xl font-bold mb-4">Backlog Scheduling</h2>
-      
-      {/* --- TAB BAR BARU --- */}
-      <div className="flex border-b mb-4">
-        <button onClick={() => setActiveTab('reguler')} className={`px-4 py-2 text-sm font-medium ${activeTab === 'reguler' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}>
-            Reguler ({schedulableBacklogs.length})
-        </button>
-        <button onClick={() => setActiveTab('shutdown')} className={`px-4 py-2 text-sm font-medium ${activeTab === 'shutdown' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}>
-            Butuh Shutdown ({shutdownBacklogs.length})
-        </button>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+
+      <h2 className="text-2xl font-bold">Backlog Scheduling Dashboard</h2>
+
+      {/* KPI */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Total Backlog</p>
+          <p className="text-2xl font-bold">{kpi.total}</p>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">High Priority</p>
+          <p className="text-2xl font-bold text-red-600">{kpi.high}</p>
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <p className="text-sm text-gray-500">Overdue &gt; 7 Hari</p>
+          <p className="text-2xl font-bold text-yellow-600">{kpi.overdue}</p>
+        </div>
       </div>
 
-      {currentList.length === 0 ? (
-        <p>Tidak ada backlog yang siap untuk dijadwalkan di tab ini.</p>
-      ) : (
-        <div className="space-y-3">
-          {currentList.map((backlog) => (
-            <div key={backlog.id} className="border p-4 rounded-lg shadow-sm bg-white flex justify-between items-center">
-              <div>
-                <p className="font-semibold">{backlog.registration_code} - {backlog.unit_code}</p>
-                <p className="text-sm text-gray-600">{backlog.problem}</p>
+      {/* FILTER BAR */}
+      <div className="bg-white p-4 rounded shadow flex flex-wrap gap-3 items-center">
+        <input
+          type="text"
+          placeholder="Search..."
+          className="border px-3 py-2 rounded text-sm w-64"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${
-    backlog.priority === 'High' ? 'bg-red-600' :
-    backlog.priority === 'Medium' ? 'bg-yellow-500' :
-    backlog.priority === 'Low' ? 'bg-blue-500' : 'bg-gray-500'
-}`}>
-    {backlog.priority || 'Low'}
-    </span>
-                
-                <p className="text-xs text-gray-400">Tanggal Lapor: {new Date(backlog.date).toLocaleDateString()}</p>
-              </div>
-              <button onClick={() => openSchedulingModal(backlog)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Jadwalkan</button>
-            </div>
-          ))}
-        </div>
-      )}
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          className="border px-3 py-2 rounded text-sm"
+        >
+          <option value="ALL">All Priority</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
 
-      {selectedBacklog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg space-y-4">
-            <h3 className="text-lg font-bold">Jadwalkan: {selectedBacklog.registration_code}</h3>
-            {/* --- DROPDOWN SHUTDOWN KONDISIONAL --- */}
-            {activeTab === 'shutdown' && (
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+          className="border px-3 py-2 rounded text-sm"
+        >
+          <option value="date">Sort by Date</option>
+          <option value="priority">Sort by Priority</option>
+        </select>
+      </div>
+
+      {/* LIST */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredBacklogs.map((b) => {
+          const aging = Math.floor(
+            (Date.now() - new Date(b.date).getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          return (
+            <div key={b.id} className="bg-white p-4 rounded shadow hover:shadow-md transition">
+              <div className="flex justify-between items-start">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Tautkan ke Event Shutdown</label>
-                    <Select
-                        options={shutdownEvents}
-                        value={selectedShutdown}
-                        onChange={(opt) => setSelectedShutdown(opt as any)}
-                        placeholder="Pilih event shutdown..."
-                    />
+                  <p className="font-semibold">
+                    {b.registration_code} - {b.unit_code}
+                  </p>
+                  <p className="text-sm text-gray-600">{b.problem}</p>
                 </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium mb-1">Tanggal Eksekusi</label>
-              <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className="w-full border rounded px-3 py-2" />
+
+                <span className={`px-2 py-1 text-xs text-white rounded ${getPriorityColor(b.priority)}`}>
+                  {b.priority || "Low"}
+                </span>
+              </div>
+
+              <div className="mt-3 text-xs text-gray-500 flex justify-between">
+                <span>Tgl Lapor: {new Date(b.date).toLocaleDateString()}</span>
+                <span className={aging > 7 ? "text-red-600 font-semibold" : ""}>
+                  Aging: {aging} hari
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSelectedBacklog(b);
+                  setScheduledDate(new Date().toISOString().split("T")[0]);
+                }}
+                className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+              >
+                Jadwalkan
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Tugaskan Mekanik</label>
-              <Select isMulti options={mechanicOptions} value={assignedMechanics} onChange={(opts) => setAssignedMechanics(opts as any)} placeholder="Pilih satu atau lebih mekanik..." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Catatan Eksekusi (Opsional)</label>
-              <textarea value={executionNotes} onChange={e => setExecutionNotes(e.target.value)} className="w-full border rounded px-3 py-2" rows={3}></textarea>
-            </div>
+          );
+        })}
+      </div>
+
+      {/* MODAL */}
+      {selectedBacklog && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg space-y-4">
+            <h3 className="text-lg font-bold">
+              Jadwalkan: {selectedBacklog.registration_code}
+            </h3>
+
+            <input
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="w-full border px-3 py-2 rounded"
+            />
+
+            <Select
+              isMulti
+              options={mechanicOptions}
+              value={assignedMechanics}
+              onChange={(opts) => setAssignedMechanics(opts as any)}
+              placeholder="Pilih mekanik..."
+            />
+
             <div className="flex justify-end gap-2">
-              <button onClick={() => setSelectedBacklog(null)} className="border rounded px-4 py-2 hover:bg-gray-100" disabled={isSaving}>Batal</button>
-              <button onClick={handleScheduleSubmit} className="bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 disabled:opacity-50" disabled={isSaving}>{isSaving ? 'Menyimpan...' : 'Simpan Jadwal'}</button>
+              <button
+                onClick={() => setSelectedBacklog(null)}
+                className="border px-4 py-2 rounded"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleScheduleSubmit}
+                disabled={isSaving}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                {isSaving ? "Menyimpan..." : "Simpan"}
+              </button>
             </div>
           </div>
         </div>
