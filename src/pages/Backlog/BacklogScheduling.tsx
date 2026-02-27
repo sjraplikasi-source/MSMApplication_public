@@ -1,5 +1,3 @@
-// src/pages/Backlog/BacklogScheduling.tsx
-
 import React, { useEffect, useState, useMemo } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -12,6 +10,7 @@ type Backlog = {
   problem: string;
   date: string;
   priority?: "High" | "Medium" | "Low" | "Improve";
+  status: string;
 };
 
 type ManpowerOption = { value: string; label: string };
@@ -20,9 +19,9 @@ type ShutdownEventOption = { value: string; label: string };
 const BacklogScheduling: React.FC = () => {
   const { user } = useAuth();
 
-  const [backlogs, setBacklogs] = useState<Backlog[]>([]);
   const [activeTab, setActiveTab] = useState<"reguler" | "shutdown">("reguler");
 
+  const [allBacklogs, setAllBacklogs] = useState<Backlog[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<"date" | "priority">("date");
@@ -57,7 +56,7 @@ const BacklogScheduling: React.FC = () => {
       .eq("status", "Direncanakan")
       .order("start_time");
 
-    setBacklogs(data || []);
+    setAllBacklogs(data || []);
 
     setMechanicOptions(
       (mechanics || []).map((m: any) => ({
@@ -78,17 +77,20 @@ const BacklogScheduling: React.FC = () => {
     return <p className="p-4 text-red-600">Akses ditolak.</p>;
   }
 
-  const filteredBacklogs = useMemo(() => {
-    return backlogs
+  /* ================= FILTERING ================= */
+
+  const currentBacklogs = useMemo(() => {
+    const filtered = allBacklogs
       .filter((b) =>
         activeTab === "reguler"
-          ? true
-          : true
+          ? b.status === "siap_dijadwalkan"
+          : b.status === "menunggu_shutdown"
       )
-      .filter((b) =>
-        b.registration_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.unit_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.problem.toLowerCase().includes(searchTerm.toLowerCase())
+      .filter(
+        (b) =>
+          b.registration_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          b.unit_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          b.problem.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .filter((b) =>
         priorityFilter === "ALL" ? true : b.priority === priorityFilter
@@ -100,35 +102,32 @@ const BacklogScheduling: React.FC = () => {
         const order = { High: 1, Medium: 2, Low: 3, Improve: 4 };
         return (order[a.priority || "Low"] || 99) - (order[b.priority || "Low"] || 99);
       });
-  }, [backlogs, searchTerm, priorityFilter, sortBy, activeTab]);
 
-  const kpi = {
-    total: filteredBacklogs.length,
-    high: filteredBacklogs.filter((b) => b.priority === "High").length,
-    overdue: filteredBacklogs.filter(
-      (b) =>
-        Math.floor(
-          (Date.now() - new Date(b.date).getTime()) / (1000 * 60 * 60 * 24)
-        ) > 7
-    ).length,
-  };
+    return filtered;
+  }, [allBacklogs, activeTab, searchTerm, priorityFilter, sortBy]);
+
+  const regulerCount = allBacklogs.filter(b => b.status === "siap_dijadwalkan").length;
+  const shutdownCount = allBacklogs.filter(b => b.status === "menunggu_shutdown").length;
 
   const getPriorityColor = (p?: string) => {
     switch (p) {
-      case "High":
-        return "bg-red-600";
-      case "Medium":
-        return "bg-yellow-500";
-      case "Low":
-        return "bg-blue-500";
-      default:
-        return "bg-gray-500";
+      case "High": return "bg-red-600";
+      case "Medium": return "bg-yellow-500";
+      case "Low": return "bg-blue-500";
+      default: return "bg-gray-500";
     }
   };
+
+  /* ================= SCHEDULING ================= */
 
   const handleScheduleSubmit = async () => {
     if (!selectedBacklog || !scheduledDate || assignedMechanics.length === 0) {
       alert("Tanggal & Mekanik wajib diisi.");
+      return;
+    }
+
+    if (activeTab === "shutdown" && !selectedShutdown) {
+      alert("Backlog shutdown wajib ditautkan ke event.");
       return;
     }
 
@@ -139,18 +138,19 @@ const BacklogScheduling: React.FC = () => {
       .update({
         status: "dijadwalkan",
         scheduled_date: scheduledDate,
+        shutdown_event_id: activeTab === "shutdown" ? selectedShutdown?.value : null,
         scheduled_by: user?.id,
         scheduled_at: new Date().toISOString(),
-        shutdown_event_id: selectedShutdown?.value || null,
       })
       .eq("id", selectedBacklog.id);
+
+    await supabase.from("backlog_assignments").delete().eq("backlog_id", selectedBacklog.id);
 
     const assignments = assignedMechanics.map((m) => ({
       backlog_id: selectedBacklog.id,
       manpower_id: m.value,
     }));
 
-    await supabase.from("backlog_assignments").delete().eq("backlog_id", selectedBacklog.id);
     await supabase.from("backlog_assignments").insert(assignments);
 
     setSelectedBacklog(null);
@@ -161,26 +161,35 @@ const BacklogScheduling: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
-      <h2 className="text-2xl font-bold">Backlog Scheduling Dashboard</h2>
+      <h2 className="text-2xl font-bold">Backlog Scheduling</h2>
 
-      {/* KPI */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Total Backlog</p>
-          <p className="text-2xl font-bold">{kpi.total}</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">High Priority</p>
-          <p className="text-2xl font-bold text-red-600">{kpi.high}</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-sm text-gray-500">Overdue &gt; 7 Hari</p>
-          <p className="text-2xl font-bold text-yellow-600">{kpi.overdue}</p>
-        </div>
+      {/* ===== TAB BAR ===== */}
+      <div className="flex border-b">
+        <button
+          onClick={() => setActiveTab("reguler")}
+          className={`px-4 py-2 text-sm font-medium ${
+            activeTab === "reguler"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-500"
+          }`}
+        >
+          Reguler ({regulerCount})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("shutdown")}
+          className={`px-4 py-2 text-sm font-medium ${
+            activeTab === "shutdown"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-500"
+          }`}
+        >
+          Butuh Shutdown ({shutdownCount})
+        </button>
       </div>
 
-      {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded shadow flex flex-wrap gap-3 items-center">
+      {/* ===== FILTER BAR ===== */}
+      <div className="bg-white p-4 rounded shadow flex gap-3 flex-wrap">
         <input
           type="text"
           placeholder="Search..."
@@ -210,56 +219,73 @@ const BacklogScheduling: React.FC = () => {
         </select>
       </div>
 
-      {/* LIST */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredBacklogs.map((b) => {
-          const aging = Math.floor(
-            (Date.now() - new Date(b.date).getTime()) / (1000 * 60 * 60 * 24)
-          );
+      {/* ===== LIST ===== */}
+      {currentBacklogs.length === 0 ? (
+        <p>Tidak ada backlog pada tab ini.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {currentBacklogs.map((b) => {
+            const aging = Math.floor(
+              (Date.now() - new Date(b.date).getTime()) / (1000 * 60 * 60 * 24)
+            );
 
-          return (
-            <div key={b.id} className="bg-white p-4 rounded shadow hover:shadow-md transition">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold">
-                    {b.registration_code} - {b.unit_code}
-                  </p>
-                  <p className="text-sm text-gray-600">{b.problem}</p>
+            return (
+              <div key={b.id} className="bg-white p-4 rounded shadow hover:shadow-md transition">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">
+                      {b.registration_code} - {b.unit_code}
+                    </p>
+                    <p className="text-sm text-gray-600">{b.problem}</p>
+                  </div>
+
+                  <span className={`px-2 py-1 text-xs text-white rounded ${getPriorityColor(b.priority)}`}>
+                    {b.priority || "Low"}
+                  </span>
                 </div>
 
-                <span className={`px-2 py-1 text-xs text-white rounded ${getPriorityColor(b.priority)}`}>
-                  {b.priority || "Low"}
-                </span>
+                <div className="mt-3 text-xs text-gray-500 flex justify-between">
+                  <span>Tgl Lapor: {new Date(b.date).toLocaleDateString()}</span>
+                  <span className={aging > 7 ? "text-red-600 font-semibold" : ""}>
+                    Aging: {aging} hari
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setSelectedBacklog(b);
+                    setScheduledDate(new Date().toISOString().split("T")[0]);
+                    setAssignedMechanics([]);
+                    setSelectedShutdown(null);
+                  }}
+                  className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+                >
+                  Jadwalkan
+                </button>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <div className="mt-3 text-xs text-gray-500 flex justify-between">
-                <span>Tgl Lapor: {new Date(b.date).toLocaleDateString()}</span>
-                <span className={aging > 7 ? "text-red-600 font-semibold" : ""}>
-                  Aging: {aging} hari
-                </span>
-              </div>
-
-              <button
-                onClick={() => {
-                  setSelectedBacklog(b);
-                  setScheduledDate(new Date().toISOString().split("T")[0]);
-                }}
-                className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-              >
-                Jadwalkan
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* MODAL */}
+      {/* ===== MODAL ===== */}
       {selectedBacklog && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg space-y-4">
             <h3 className="text-lg font-bold">
               Jadwalkan: {selectedBacklog.registration_code}
             </h3>
+
+            {activeTab === "shutdown" && (
+              <div>
+                <label className="block text-sm mb-1">Tautkan Event Shutdown</label>
+                <Select
+                  options={shutdownEvents}
+                  value={selectedShutdown}
+                  onChange={(opt) => setSelectedShutdown(opt as any)}
+                />
+              </div>
+            )}
 
             <input
               type="date"
@@ -277,10 +303,7 @@ const BacklogScheduling: React.FC = () => {
             />
 
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setSelectedBacklog(null)}
-                className="border px-4 py-2 rounded"
-              >
+              <button onClick={() => setSelectedBacklog(null)} className="border px-4 py-2 rounded">
                 Batal
               </button>
               <button
