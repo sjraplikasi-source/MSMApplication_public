@@ -17,6 +17,7 @@ type BacklogRow = {
   shutdown_required?: boolean | null;
   validated_at?: string | null;
   validated_by_user?: { name?: string | null } | null;
+  created_by_user?: { name?: string | null } | null;
 };
 
 const fmtDate = (v?: string | null) =>
@@ -62,7 +63,7 @@ export async function exportBacklogsExcel(): Promise<void> {
     .select(`
       id, registration_code, unit_code, problem, date, status, priority,
       need_sparepart, need_tools, need_manpower, need_shutdown, shutdown_required,
-      validated_at,
+      validated_at, created_by_user:users!backlogs_created_by_fkey(name),
       validated_by_user:users!backlogs_validated_by_fkey(name)
     `)
     .order("date", { ascending: false });
@@ -89,6 +90,7 @@ export async function exportBacklogsExcel(): Promise<void> {
       b.problem ?? "",
       b.status ?? "",
       b.priority ?? "Improve",
+      b.created_by_user?.name ?? "",
       b.need_sparepart ? "Ya" : "Tidak",
       b.need_tools ? "Ya" : "Tidak",
       b.need_manpower ? "Ya" : "Tidak",
@@ -108,6 +110,7 @@ export async function exportBacklogsExcel(): Promise<void> {
       "Problem",
       "Status",
       "Prioritas",
+      "Input By",
       "Butuh Sparepart",
       "Butuh Tools",
       "Butuh Manpower",
