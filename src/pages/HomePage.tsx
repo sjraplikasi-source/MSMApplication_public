@@ -286,8 +286,8 @@ const HomePage: React.FC = () => {
 
               
                 <div>
-                    <p className="mt-1 text-gray-500">
-                        Site MSM Dept. PT Sumbawa Jutaraya
+                    <p className="mt-1 text-blue-200">
+                        Site MSM, PT Sumbawa Jutaraya
                     </p>
                 </div>
 
