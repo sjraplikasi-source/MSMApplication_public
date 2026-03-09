@@ -1,1 +1,1 @@
-MSMApplication
+MSMApplicationSJR
