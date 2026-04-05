@@ -18,8 +18,10 @@ const ReportForm = () => {
   const [masters, setMasters] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // ✅ HM CONTROL
+
+// ✅ HM CONTROL
 const [lastHM, setLastHM] = useState<number | null>(null);
+const [lastHMDate, setLastHMDate] = useState<string | null>(null);
 const [hmWarning, setHmWarning] = useState<string | null>(null);
 const [hmDelta, setHmDelta] = useState<number | null>(null);
 
@@ -149,37 +151,50 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
     loadMasters();
   }, [user]);
 
-  // ✅ FETCH LAST HM
-const fetchLastHM = async (equipmentId: string) => {
+  // ✅ FETCH LAST HM (HISTORICAL-AWARE)
+const fetchLastHM = async (equipmentId: string, selectedDate?: string) => {
 
   if (!equipmentId) {
     setLastHM(null);
+    setLastHMDate(null);
     return;
   }
 
-  const { data } = await supabase
+  let query = supabase
     .from("hour_meter_readings")
     .select("hours, reading_date")
-    .eq("equipment_id", equipmentId)
+    .eq("equipment_id", equipmentId);
+
+  // 🔥 Ambil HM terakhir sebelum / sama dengan tanggal input
+  if (selectedDate) {
+    query = query.lte("reading_date", selectedDate);
+  }
+
+  const { data } = await query
     .order("reading_date", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (data) setLastHM(Number(data.hours));
-  else setLastHM(null);
+  if (data) {
+    setLastHM(Number(data.hours));
+    setLastHMDate(data.reading_date);
+  } else {
+    setLastHM(null);
+    setLastHMDate(null);
+  }
 };
 
-  // ✅ LOAD LAST HM SAAT EQUIPMENT CHANGE
+// ✅ LOAD LAST HM SAAT EQUIPMENT / DATE BERUBAH
 useEffect(() => {
-  if (form.equipment_id) {
-    fetchLastHM(form.equipment_id);
+  if (form.equipment_id && form.start_date) {
+    fetchLastHM(form.equipment_id, form.start_date);
   }
-}, [form.equipment_id]);
+}, [form.equipment_id, form.start_date]);
 
-  // ✅ HM VALIDATION
+// ✅ HM VALIDATION (REALISTIC RULE)
 useEffect(() => {
 
-  if (!form.hour_meter || lastHM === null) {
+  if (!form.hour_meter || lastHM === null || !lastHMDate || !form.start_date) {
     setHmWarning(null);
     setHmDelta(null);
     return;
@@ -191,19 +206,34 @@ useEffect(() => {
   const delta = hmValue - lastHM;
   setHmDelta(delta);
 
+  // ❌ RULE 1: HM tidak boleh mundur
   if (hmValue < lastHM) {
-    setHmWarning("HM lebih kecil dari reading terakhir");
+    setHmWarning("HM lebih kecil dari reading sebelumnya");
     return;
   }
 
-  if (delta > 24) {
-    setHmWarning(`Delta HM (${delta} jam) melebihi batas 24 jam`);
+  const lastDate = new Date(lastHMDate);
+  const currentDate = new Date(form.start_date);
+
+  const diffTime = currentDate.getTime() - lastDate.getTime();
+  const diffDays = diffTime / (1000 * 3600 * 24);
+
+  // Minimal 1 hari untuk handle same-day input
+  const effectiveDays = diffDays <= 0 ? 1 : diffDays;
+
+  const maxAllowedDelta = effectiveDays * 24;
+
+  // ❌ RULE 2: max 24 jam per hari
+  if (delta > maxAllowedDelta) {
+    setHmWarning(
+      `Delta HM (${delta} jam) melebihi batas wajar (${maxAllowedDelta.toFixed(1)} jam untuk ${effectiveDays.toFixed(1)} hari)`
+    );
     return;
   }
 
   setHmWarning(null);
 
-}, [form.hour_meter, lastHM]);
+}, [form.hour_meter, form.start_date, lastHM, lastHMDate]);
   
   // Handle Perubahan Input
   const handleChange = (field: string, value: any) => {
@@ -476,6 +506,18 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
           {lastHM !== null && (
   <div className="text-xs text-gray-500 mt-1">
     Last HM : {lastHM.toLocaleString()}
+  </div>
+)}
+
+{lastHM !== null && (
+  <div className="text-xs text-gray-500 mt-1">
+    Last HM : {lastHM.toLocaleString()}
+  </div>
+)}
+
+{lastHMDate && (
+  <div className="text-xs text-gray-500">
+    Last Date : {lastHMDate}
   </div>
 )}
 
