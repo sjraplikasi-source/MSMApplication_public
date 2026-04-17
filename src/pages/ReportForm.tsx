@@ -19,13 +19,11 @@ const ReportForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-// ✅ HM CONTROL
-const [lastHM, setLastHM] = useState<number | null>(null);
-const [lastHMDate, setLastHMDate] = useState<string | null>(null);
-const [hmWarning, setHmWarning] = useState<string | null>(null);
-const [hmDelta, setHmDelta] = useState<number | null>(null);
+  const [lastHM, setLastHM] = useState<number | null>(null);
+  const [lastHMDate, setLastHMDate] = useState<string | null>(null);
+  const [hmWarning, setHmWarning] = useState<string | null>(null);
+  const [hmDelta, setHmDelta] = useState<number | null>(null);
 
-  // Inisialisasi form kosong
   const emptyForm = {
     wo_number: '',
     equipment_id: '',
@@ -38,7 +36,7 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
     hour_meter: '',
     approved_name: '',
     approved_by_id: '',
-    approved_by: null, // Tambahan untuk cek status approval
+    approved_by: null,
     manpower_ids: [],
     failure_id: '',
     diagnosis_id: '',
@@ -60,19 +58,54 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
     status: 'submitted'
   };
 
-  // Load Data Report (Edit Mode) & LocalStorage (Create Mode)
+  const validateHMValue = (
+    hmValueRaw: any,
+    referenceHM: number | null,
+    referenceDate: string | null,
+    currentDate: string
+  ) => {
+    if (hmValueRaw === '' || hmValueRaw === null || hmValueRaw === undefined) {
+      return null;
+    }
+
+    const hmValue = Number(hmValueRaw);
+    if (isNaN(hmValue)) {
+      return 'Hour Meter tidak valid';
+    }
+
+    if (referenceHM === null || !referenceDate || !currentDate) {
+      return null;
+    }
+
+    if (hmValue < referenceHM) {
+      return 'HM lebih kecil dari reading sebelumnya';
+    }
+
+    const delta = hmValue - referenceHM;
+    const lastDateValue = new Date(referenceDate);
+    const currentDateValue = new Date(currentDate);
+    const diffTime = currentDateValue.getTime() - lastDateValue.getTime();
+    const diffDays = diffTime / (1000 * 3600 * 24);
+    const effectiveDays = diffDays <= 0 ? 1 : diffDays;
+    const maxAllowedDelta = effectiveDays * 24;
+
+    if (delta > maxAllowedDelta) {
+      return `Delta HM (${delta} jam) melebihi batas wajar (${maxAllowedDelta.toFixed(1)} jam untuk ${effectiveDays.toFixed(1)} hari)`;
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     const fetchAndSet = async () => {
       if (isEdit && id) {
-        // Ambil data dari supabase
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('repair_reports')
           .select('*')
           .eq('id', id)
           .single();
 
         if (data) {
-          // Load manpower_ids jika relasi ada
           const { data: manpower } = await supabase
             .from('repair_reports_manpower')
             .select('manpower_id')
@@ -86,7 +119,6 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
           setForm({ ...emptyForm, submitted_by: user?.id || '' });
         }
       } else {
-        // Mode tambah, load localstorage/buat baru
         const saved = localStorage.getItem('unsavedReportForm');
         if (saved) {
           setForm(JSON.parse(saved));
@@ -99,7 +131,6 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
     fetchAndSet();
   }, [user, isEdit, id]);
 
-  // Load Master Data (Dropdowns)
   useEffect(() => {
     const loadMasters = async () => {
       const tables = [
@@ -107,18 +138,17 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
         'finding', 'problems', 'activities', 'activity_type', 'area', 'manpower'
       ];
       const result: any = {};
-      
-      // Helper untuk fetch biar gak error kalau tabel kosong/tidak ada
+
       const fetchTable = async (table: string) => {
-          try {
-            const columns = table === 'equipment' ? 'id, name, code' : 'id, name';
-            const { data } = await supabase.from(table).select(columns);
-            return data || [];
-          } catch (e) {
-            console.warn(`Gagal load ${table}`);
-            return [];
-          }
-      }
+        try {
+          const columns = table === 'equipment' ? 'id, name, code' : 'id, name';
+          const { data } = await supabase.from(table).select(columns);
+          return data || [];
+        } catch {
+          console.warn(`Gagal load ${table}`);
+          return [];
+        }
+      };
 
       for (const table of tables) {
         result[table] = await fetchTable(table);
@@ -151,96 +181,61 @@ const [hmDelta, setHmDelta] = useState<number | null>(null);
     loadMasters();
   }, [user]);
 
-  // ✅ FETCH LAST HM (HISTORICAL-AWARE)
-const fetchLastHM = async (equipmentId: string, selectedDate?: string) => {
+  const fetchLastHM = async (equipmentId: string, selectedDate?: string) => {
+    if (!equipmentId) {
+      setLastHM(null);
+      setLastHMDate(null);
+      return;
+    }
 
-  if (!equipmentId) {
-    setLastHM(null);
-    setLastHMDate(null);
-    return;
-  }
+    let query = supabase
+      .from('hour_meter_readings')
+      .select('hours, reading_date')
+      .eq('equipment_id', equipmentId);
 
-  let query = supabase
-    .from("hour_meter_readings")
-    .select("hours, reading_date")
-    .eq("equipment_id", equipmentId);
+    if (selectedDate) {
+      query = query.lte('reading_date', selectedDate);
+    }
 
-  // 🔥 Ambil HM terakhir sebelum / sama dengan tanggal input
-  if (selectedDate) {
-    query = query.lte("reading_date", selectedDate);
-  }
+    const { data } = await query
+      .order('reading_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const { data } = await query
-    .order("reading_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    if (data) {
+      setLastHM(Number(data.hours));
+      setLastHMDate(data.reading_date);
+    } else {
+      setLastHM(null);
+      setLastHMDate(null);
+    }
+  };
 
-  if (data) {
-    setLastHM(Number(data.hours));
-    setLastHMDate(data.reading_date);
-  } else {
-    setLastHM(null);
-    setLastHMDate(null);
-  }
-};
+  useEffect(() => {
+    if (form.equipment_id && form.start_date) {
+      fetchLastHM(form.equipment_id, form.start_date);
+    }
+  }, [form.equipment_id, form.start_date]);
 
-// ✅ LOAD LAST HM SAAT EQUIPMENT / DATE BERUBAH
-useEffect(() => {
-  if (form.equipment_id && form.start_date) {
-    fetchLastHM(form.equipment_id, form.start_date);
-  }
-}, [form.equipment_id, form.start_date]);
+  useEffect(() => {
+    if (!form.hour_meter || lastHM === null || !lastHMDate || !form.start_date) {
+      setHmWarning(null);
+      setHmDelta(null);
+      return;
+    }
 
-// ✅ HM VALIDATION (REALISTIC RULE)
-useEffect(() => {
+    const hmValue = Number(form.hour_meter);
+    if (isNaN(hmValue)) return;
 
-  if (!form.hour_meter || lastHM === null || !lastHMDate || !form.start_date) {
-    setHmWarning(null);
-    setHmDelta(null);
-    return;
-  }
+    const delta = hmValue - lastHM;
+    setHmDelta(delta);
+    setHmWarning(validateHMValue(form.hour_meter, lastHM, lastHMDate, form.start_date));
+  }, [form.hour_meter, form.start_date, lastHM, lastHMDate]);
 
-  const hmValue = Number(form.hour_meter);
-  if (isNaN(hmValue)) return;
-
-  const delta = hmValue - lastHM;
-  setHmDelta(delta);
-
-  // ❌ RULE 1: HM tidak boleh mundur
-  if (hmValue < lastHM) {
-    setHmWarning("HM lebih kecil dari reading sebelumnya");
-    return;
-  }
-
-  const lastDate = new Date(lastHMDate);
-  const currentDate = new Date(form.start_date);
-
-  const diffTime = currentDate.getTime() - lastDate.getTime();
-  const diffDays = diffTime / (1000 * 3600 * 24);
-
-  // Minimal 1 hari untuk handle same-day input
-  const effectiveDays = diffDays <= 0 ? 1 : diffDays;
-
-  const maxAllowedDelta = effectiveDays * 24;
-
-  // ❌ RULE 2: max 24 jam per hari
-  if (delta > maxAllowedDelta) {
-    setHmWarning(
-      `Delta HM (${delta} jam) melebihi batas wajar (${maxAllowedDelta.toFixed(1)} jam untuk ${effectiveDays.toFixed(1)} hari)`
-    );
-    return;
-  }
-
-  setHmWarning(null);
-
-}, [form.hour_meter, form.start_date, lastHM, lastHMDate]);
-  
-  // Handle Perubahan Input
   const handleChange = (field: string, value: any) => {
     setForm((prevForm: any) => {
       const updatedForm = { ...prevForm, [field]: value };
 
-      // Hitung duration update
       if (
         updatedForm.start_date &&
         updatedForm.start_hour &&
@@ -249,171 +244,205 @@ useEffect(() => {
       ) {
         const start = new Date(`${updatedForm.start_date}T${updatedForm.start_hour}`);
         const finish = new Date(`${updatedForm.finish_date}T${updatedForm.finish_hour}`);
-        const diff = (finish.getTime() - start.getTime()) / 1000 / 3600; // jam
-        updatedForm.duration = diff >= 0 ? parseFloat(diff.toFixed(2)) : "";
+        const diff = (finish.getTime() - start.getTime()) / 1000 / 3600;
+        updatedForm.duration = diff >= 0 ? parseFloat(diff.toFixed(2)) : '';
       }
 
-      // Save draft to localStorage (Only if creating new)
       if (!isEdit) {
-         localStorage.setItem('unsavedReportForm', JSON.stringify(updatedForm));
+        localStorage.setItem('unsavedReportForm', JSON.stringify(updatedForm));
       }
 
       return updatedForm;
     });
   };
 
-  // --- FUNGSI 1: STANDARD SUBMIT (Simpan Draft / Create New) ---
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!isHMValid) {
-    setError("Periksa nilai Hour Meter");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-    const { manpower_ids, ...payload } = form;
-    const cleanedPayload = {
-      ...Object.fromEntries(
-        Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v])
-      ),
-      // Jika create baru force submitted, jika edit biarkan status lama (kecuali diubah logic lain)
-      status: form.status || 'submitted' 
-    };
-
-    let dataRes;
-    let errorRes;
-
-    if (isEdit && id) {
-      // UPDATE DATA
-      const { error } = await supabase
-        .from('repair_reports')
-        .update(cleanedPayload)
-        .eq('id', id);
-
-      errorRes = error;
-      dataRes = { id }; 
-
-      // Update Relasi Manpower
-      if (!error) {
-        await updateManpowerRelation(id, manpower_ids);
-      }
-    } else {
-      // INSERT BARU
-      const { data, error } = await supabase
-        .from('repair_reports')
-        .insert([cleanedPayload])
-        .select();
-      dataRes = data && data[0];
-      errorRes = error;
-
-      if (!error && dataRes) {
-         await updateManpowerRelation(dataRes.id, manpower_ids);
-      }
-    }
-
-    if (errorRes || !dataRes) {
-      setError(errorRes?.message || 'Gagal menyimpan laporan');
-      setLoading(false);
+    if (!isHMValid) {
+      setError(hmWarning || 'Periksa nilai Hour Meter');
       return;
     }
-
-    // ✅ UPSERT HM
-if (form.hour_meter && form.equipment_id && form.start_date) {
-
-  const hmValue = Number(form.hour_meter);
-
-  const { error: hmError } = await supabase
-    .from("hour_meter_readings")
-    .upsert([
-      {
-        equipment_id: form.equipment_id,
-        reading_date: form.start_date,
-        hours: hmValue,
-      }
-    ], {
-      onConflict: "equipment_id,reading_date"
-    });
-
-  if (hmError) {
-    console.warn("HM rejected:", hmError.message);
-  }
-}
-    
-    // Clear draft if success create
-    if (!isEdit) localStorage.removeItem('unsavedReportForm');
-
-    navigate('/reports');
-    setLoading(false);
-  };
-
-  // --- FUNGSI 2: SAVE & VALIDATE (GL ONLY) ---
-  const handleSaveAndValidate = async () => {
-    if (!isEdit || !id || !user) return;
-    if (!window.confirm("Apakah data sudah benar? Laporan akan disetujui (Approved).")) return;
 
     setLoading(true);
     setError(null);
 
     const { manpower_ids, ...payload } = form;
-    
-    // Siapkan payload dengan Status Approved
     const cleanedPayload = {
       ...Object.fromEntries(
         Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v])
       ),
-      status: 'approved', // Force Status Approved
-      approved_by: user.id,
-      approved_by_id: user.id,
-      approved_name: user.user_metadata?.full_name || user.email
+      status: form.status || 'submitted'
     };
 
-    // Update Data Utama
+    let dataRes;
+    let errorRes;
+    let createdReportId: string | null = null;
+
+    try {
+      if (form.hour_meter && form.equipment_id && form.start_date) {
+        const { data: latestHM, error: latestHMError } = await supabase
+          .from('hour_meter_readings')
+          .select('hours, reading_date')
+          .eq('equipment_id', form.equipment_id)
+          .lte('reading_date', form.start_date)
+          .order('reading_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestHMError) {
+          throw new Error(`Gagal memvalidasi Hour Meter: ${latestHMError.message}`);
+        }
+
+        const latestHMValue = latestHM ? Number(latestHM.hours) : null;
+        const latestHMDate = latestHM?.reading_date || null;
+        const hmValidationError = validateHMValue(form.hour_meter, latestHMValue, latestHMDate, form.start_date);
+
+        if (hmValidationError) {
+          setLastHM(latestHMValue);
+          setLastHMDate(latestHMDate);
+          setHmWarning(hmValidationError);
+          throw new Error(hmValidationError);
+        }
+      }
+
+      if (isEdit && id) {
+        const { error } = await supabase
+          .from('repair_reports')
+          .update(cleanedPayload)
+          .eq('id', id);
+
+        errorRes = error;
+        dataRes = { id };
+
+        if (!error) {
+          await updateManpowerRelation(id, manpower_ids);
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('repair_reports')
+          .insert([cleanedPayload])
+          .select();
+        dataRes = data && data[0];
+        errorRes = error;
+
+        if (!error && dataRes) {
+          createdReportId = dataRes.id;
+          await updateManpowerRelation(dataRes.id, manpower_ids);
+        }
+      }
+
+      if (errorRes || !dataRes) {
+        throw new Error(errorRes?.message || 'Gagal menyimpan laporan');
+      }
+
+      if (form.hour_meter && form.equipment_id && form.start_date) {
+        const hmValue = Number(form.hour_meter);
+
+        const { error: hmError } = await supabase
+          .from('hour_meter_readings')
+          .upsert([
+            {
+              equipment_id: form.equipment_id,
+              reading_date: form.start_date,
+              hours: hmValue,
+            }
+          ], {
+            onConflict: 'equipment_id,reading_date'
+          });
+
+        if (hmError) {
+          throw new Error(`Gagal menyimpan Hour Meter: ${hmError.message}`);
+        }
+      }
+
+      if (!isEdit) localStorage.removeItem('unsavedReportForm');
+
+      navigate('/reports');
+    } catch (submitError: any) {
+      if (!isEdit && createdReportId) {
+        await supabase
+          .from('repair_reports_manpower')
+          .delete()
+          .eq('report_id', createdReportId);
+
+        await supabase
+          .from('repair_reports')
+          .delete()
+          .eq('id', createdReportId);
+      }
+
+      setError(submitError?.message || 'Gagal menyimpan laporan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAndValidate = async () => {
+    if (!isEdit || !id || !user) return;
+    if (!window.confirm('Apakah data sudah benar? Laporan akan disetujui (Approved).')) return;
+
+    setLoading(true);
+    setError(null);
+
+    const { manpower_ids, ...payload } = form;
+
+    const cleanedPayload = {
+      ...Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [k, v === '' ? null : v])
+      ),
+      status: 'approved',
+      approved_by: user.id,
+      approved_by_id: user.id,
+      approved_name: user?.name || user?.email
+    };
+
     const { error } = await supabase
-        .from('repair_reports')
-        .update(cleanedPayload)
-        .eq('id', id);
+      .from('repair_reports')
+      .update(cleanedPayload)
+      .eq('id', id);
 
     if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
+      setError(error.message);
+      setLoading(false);
+      return;
     }
 
-    // Update Manpower juga (jaga-jaga ada perubahan personil saat validasi)
     await updateManpowerRelation(id, manpower_ids);
 
     setLoading(false);
-    navigate('/validasi'); // Redirect ke halaman validasi
+    navigate('/validasi');
   };
 
-  // Helper untuk update relasi manpower (biar gak duplikat code)
   const updateManpowerRelation = async (reportId: string, manpowerIds: any[]) => {
-      // Hapus lama
-      await supabase
-        .from('repair_reports_manpower')
-        .delete()
-        .eq('report_id', reportId);
+    const { error: deleteError } = await supabase
+      .from('repair_reports_manpower')
+      .delete()
+      .eq('report_id', reportId);
 
-      // Insert baru
-      if (manpowerIds && manpowerIds.length) {
-        const inserts = manpowerIds.map((mid: string) => ({
-          report_id: reportId,
-          manpower_id: mid,
-        }));
-        await supabase.from('repair_reports_manpower').insert(inserts);
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
+
+    if (manpowerIds && manpowerIds.length) {
+      const inserts = manpowerIds.map((mid: string) => ({
+        report_id: reportId,
+        manpower_id: mid,
+      }));
+      const { error: insertError } = await supabase.from('repair_reports_manpower').insert(inserts);
+
+      if (insertError) {
+        throw new Error(insertError.message);
       }
+    }
   };
 
   const isHMValid = !hmWarning;
-  
-  // --- RENDER HELPERS ---
+
   const renderSearchSelect = (label: string, field: string, source: string, showCode = false) => {
     const options = (masters[source] || []).map((item: any) => ({
       value: item.id,
-      label: showCode && item.code ? `${item.code} — ${item.name}` : item.name
+      label: showCode && item.code ? `${item.code} - ${item.name}` : item.name
     }));
 
     return (
@@ -425,7 +454,7 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
           onChange={(selected: any) => handleChange(field, selected?.value || '')}
           isClearable
           isSearchable
-          menuPortalTarget={document.body} 
+          menuPortalTarget={document.body}
           styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
         />
       </div>
@@ -456,32 +485,28 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
     <div className="p-4 max-w-3xl mx-auto mb-20">
       <Link to="/reports" className="text-blue-600 text-sm block mb-2">&larr; Kembali</Link>
       <h2 className="text-xl font-bold mb-4">{isEdit ? 'Edit Laporan Breakdown' : 'Add Report Activity'}</h2>
-      
+
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* ROW 1 */}
         <div className="w-full">
           <label className="block text-sm mb-1">WO Number</label>
           <input type="text" className="border px-3 py-2 w-full rounded" value={form.wo_number} onChange={(e) => handleChange('wo_number', e.target.value)} />
         </div>
         {renderSearchSelect('Equipment', 'equipment_id', 'equipment', true)}
 
-        {/* ROW 2 */}
         <div className="sm:col-span-2">
           <label className="block text-sm mb-1">Problem Description</label>
           <textarea className="border px-3 py-2 w-full rounded" rows={2} value={form.problem_description} onChange={(e) => handleChange('problem_description', e.target.value)} />
         </div>
 
-        {/* ROW 3 */}
         <div className="w-full">
           <label className="block text-sm mb-1">Part Causing Failure</label>
           <input type="text" className="border px-3 py-2 w-full rounded" value={form.part_causing_failure} onChange={(e) => handleChange('part_causing_failure', e.target.value)} />
         </div>
         <div className="w-full">
-            <label className="block text-sm mb-1">Part Number</label>
-            <input type="text" className="border px-3 py-2 w-full rounded" value={form.part_number} onChange={(e) => handleChange('part_number', e.target.value)} />
+          <label className="block text-sm mb-1">Part Number</label>
+          <input type="text" className="border px-3 py-2 w-full rounded" value={form.part_number} onChange={(e) => handleChange('part_number', e.target.value)} />
         </div>
 
-        {/* DATES */}
         <div className="w-full">
           <label className="block text-sm mb-1">Start Date</label>
           <input type="date" className="border px-3 py-2 w-full rounded" value={form.start_date} onChange={(e) => handleChange('start_date', e.target.value)} />
@@ -498,48 +523,39 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
           <label className="block text-sm mb-1">Finish Hour</label>
           <input type="time" className="border px-3 py-2 w-full rounded" value={form.finish_hour} onChange={(e) => handleChange('finish_hour', e.target.value)} />
         </div>
-        
-        {/* HM & SHIFT */}
+
         <div className="w-full">
-            <label className="block text-sm mb-1">Hour Meter</label>
-            <input type="number" className="border px-3 py-2 w-full rounded" value={form.hour_meter} onChange={(e) => handleChange('hour_meter', e.target.value)} placeholder="Angka..." />
+          <label className="block text-sm mb-1">Hour Meter</label>
+          <input type="number" className="border px-3 py-2 w-full rounded" value={form.hour_meter} onChange={(e) => handleChange('hour_meter', e.target.value)} placeholder="Angka..." />
           {lastHM !== null && (
-  <div className="text-xs text-gray-500 mt-1">
-    Last HM : {lastHM.toLocaleString()}
-  </div>
-)}
+            <div className="text-xs text-gray-500 mt-1">
+              Last HM : {lastHM.toLocaleString()}
+            </div>
+          )}
 
-{lastHM !== null && (
-  <div className="text-xs text-gray-500 mt-1">
-    Last HM : {lastHM.toLocaleString()}
-  </div>
-)}
+          {lastHMDate && (
+            <div className="text-xs text-gray-500">
+              Last Date : {lastHMDate}
+            </div>
+          )}
 
-{lastHMDate && (
-  <div className="text-xs text-gray-500">
-    Last Date : {lastHMDate}
-  </div>
-)}
+          {hmDelta !== null && (
+            <div className="text-xs text-gray-600">
+              Delta : {hmDelta} jam
+            </div>
+          )}
 
-{hmDelta !== null && (
-  <div className="text-xs text-gray-600">
-    Delta : {hmDelta} jam
-  </div>
-)}
-
-{hmWarning && (
-  <div className="text-xs text-red-500 font-medium">
-    🚨 {hmWarning}
-  </div>
-)}
+          {hmWarning && (
+            <div className="text-xs text-red-500 font-medium">
+              🚨 {hmWarning}
+            </div>
+          )}
         </div>
         {renderSearchSelect('Shift', 'shift', 'shift_enum')}
-        
-        {/* GL & MANPOWER */}
+
         {renderSearchSelect('Group Leader', 'approved_by_id', 'group_leaders')}
         {renderMultiSelect('Manpower', 'manpower_ids', 'manpower')}
 
-        {/* DETAILS */}
         {renderSearchSelect('Failure', 'failure_id', 'failure')}
         {renderSearchSelect('Diagnosis', 'diagnosis_id', 'diagnosis')}
         {renderSearchSelect('Reason', 'reason_id', 'reason')}
@@ -553,8 +569,8 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
         {renderSearchSelect('Activity Type', 'activity_type_id', 'activity_type')}
 
         <div className="sm:col-span-2">
-            <label className="block text-sm mb-1">Komentar Mekanik</label>
-            <textarea className="border px-3 py-2 w-full rounded" rows={2} value={form.mechanic_comment} onChange={(e) => handleChange('mechanic_comment', e.target.value)} />
+          <label className="block text-sm mb-1">Komentar Mekanik</label>
+          <textarea className="border px-3 py-2 w-full rounded" rows={2} value={form.mechanic_comment} onChange={(e) => handleChange('mechanic_comment', e.target.value)} />
         </div>
 
         {renderSearchSelect('Status Breakdown', 'status_breakdown', 'status_breakdown')}
@@ -562,35 +578,30 @@ if (form.hour_meter && form.equipment_id && form.start_date) {
 
         {error && <p className="text-red-600 text-sm sm:col-span-2 text-center bg-red-50 p-2 rounded">{error}</p>}
 
-        {/* --- AREA TOMBOL (ACTION BUTTONS) --- */}
         <div className="sm:col-span-2 flex flex-col sm:flex-row gap-4 mt-6 pt-6 border-t">
-          
-          {/* Tombol Simpan Standard (Draft/Update) */}
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded transition-colors"
             disabled={loading || !isHMValid}
           >
             {loading ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Submit Laporan Baru')}
           </button>
 
-          {/* Tombol Validate (Hanya muncul jika Edit Mode DAN Belum Approved) */}
           {isEdit && !form.approved_by && (
-             <button 
-                type="button" 
-                onClick={handleSaveAndValidate}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded transition-colors flex justify-center items-center gap-2"
-                disabled={loading}
-             >
-                {loading ? 'Memproses...' : (
-                    <>
-                        <span>Simpan & Setujui</span>
-                        <span className="text-xs bg-green-800 px-2 py-0.5 rounded text-green-100 uppercase font-bold">Validate</span>
-                    </>
-                )}
-             </button>
+            <button
+              type="button"
+              onClick={handleSaveAndValidate}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded transition-colors flex justify-center items-center gap-2"
+              disabled={loading}
+            >
+              {loading ? 'Memproses...' : (
+                <>
+                  <span>Simpan & Setujui</span>
+                  <span className="text-xs bg-green-800 px-2 py-0.5 rounded text-green-100 uppercase font-bold">Validate</span>
+                </>
+              )}
+            </button>
           )}
-
         </div>
       </form>
     </div>
