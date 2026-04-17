@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Select from 'react-select';
 import { useAuth } from '@/context/AuthContext';
+import { safeInsert } from "@/offline/safeDb"
 
 const STATUS = {
   DRAFT: 'draft',
@@ -110,15 +111,39 @@ useEffect(() => {
   }, []);
 
   const generateNewCode = async () => {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const { data } = await supabase.rpc('generate_backlog_registration_code');
-      if (data && !usedCodes.has(data)) {
-        setRegistrationCode(data);
-        return;
-      }
+
+  // Jika offline → generate kode lokal
+  if (!navigator.onLine) {
+
+    const now = new Date()
+
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, "0")
+    const dd = String(now.getDate()).padStart(2, "0")
+
+    const random = String(Math.floor(Math.random() * 1000)).padStart(3, "0")
+
+    const code = `BL-${yyyy}${mm}${dd}-${random}`
+
+    setRegistrationCode(code)
+
+    return
+  }
+
+  // Jika online → pakai RPC database
+  for (let attempt = 0; attempt < 5; attempt++) {
+
+    const { data } = await supabase.rpc("generate_backlog_registration_code")
+
+    if (data && !usedCodes.has(data)) {
+      setRegistrationCode(data)
+      return
     }
-    alert('Gagal menghasilkan kode registrasi unik. Silakan coba lagi.');
-  };
+
+  }
+
+  alert("Gagal menghasilkan kode registrasi unik. Silakan coba lagi.")
+};
 
 useEffect(() => {
     const fetchEquipment = async () => {
@@ -146,7 +171,7 @@ useEffect(() => {
     setNeedManpower(false);
     setNeedShutdown(false);
     setShutdownRequired('');
-    setSpareparts([{ part_number: '', part_name: '', qty: 1, remarks: '' }]);
+    setSpareparts([{ _cid: cid(), part_number: '', part_name: '', qty: 1, remarks: '' }]);
     setTools([{ tool_name: '', specification: '', qty: 1, remarks: '' }]);
     setManpower([{ skill_required: '', qty: 1, remarks: '' }]);
     await generateNewCode();
@@ -209,9 +234,7 @@ useEffect(() => {
       return;
     }
 
-    const { data: backlog, error } = await supabase
-      .from('backlogs')
-.insert({
+    const backlog = await safeInsert("backlogs", {
   unit_code: selectedEquipment?.value || '',
   date,
   problem,
@@ -223,18 +246,9 @@ useEffect(() => {
   registration_code: registrationCode,
   priority: selectedPriority?.value || 'Low',
   status: STATUS.DRAFT,
-  created_by: user?.id || null, // <-- TAMBAHKAN BARIS INI
-})
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Gagal simpan backlog', error);
-      alert('Gagal menyimpan backlog.');
-      return;
-    }
-
-    const backlogId = (backlog as any).id;
+  created_by: user?.id || null, 
+});
+    const backlogId = (backlog as any)?.id;
 
 if (needSparepart) {
   // Filter item yang kosong agar tidak tersimpan
@@ -245,17 +259,17 @@ if (needSparepart) {
   for (const item of filledSpareparts) {
     // Hapus properti temporary sebelum insert
     const { _cid, uploading, ...dbData } = item;
-    await supabase.from('backlog_spareparts').insert({ backlog_id: backlogId, ...dbData });
+    await safeInsert("backlog_spareparts", { backlog_id: backlogId, ...dbData });
   }
 }
     if (needTools) {
       for (const item of tools) {
-        await supabase.from('backlog_tools').insert({ backlog_id: backlogId, ...item });
+        await safeInsert("backlog_tools", { backlog_id: backlogId, ...item });
       }
     }
     if (needManpower) {
       for (const item of manpower) {
-        await supabase.from('backlog_manpower').insert({ backlog_id: backlogId, ...item });
+        await safeInsert("backlog_manpower", { backlog_id: backlogId, ...item });
       }
     }
 

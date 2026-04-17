@@ -18,7 +18,7 @@ import Download from "./pages/Download";
 import Configuration from "./pages/Configuration";
 import UserActivation from "./pages/UserActivation";
 import BreakdownParetoPage from "./pages/BreakdownParetoPage";
-import ReportEdit from "./pages/ReportEdit";
+// import ReportEdit from "./pages/ReportEdit";
 
 import InputBacklog from "./pages/Backlog/BacklogForm";
 import BacklogValidation from "./pages/Backlog/BacklogValidation";
@@ -44,6 +44,8 @@ import ToolRoom from "./pages/ToolRoom";
 
 import AutoUpdateHandler from './components/AutoUpdateHandler';
 
+import { useEffect } from "react"
+import { syncQueue } from "./offline/syncService"
 
 // Lazy load modul MineMaintenance
 const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
@@ -149,6 +151,33 @@ function AppRoutes() {
 // Main App
 // ======================================================
 function App() {
+
+  useEffect(() => {
+
+  const handleOnline = () => {
+    console.log("Internet kembali, syncing queue...")
+    syncQueue()
+  }
+
+  window.addEventListener("online", handleOnline)
+
+  if (navigator.onLine) {
+    syncQueue()
+  }
+
+  const interval = setInterval(() => {
+    if (navigator.onLine) {
+      syncQueue()
+    }
+  }, 60000)
+
+  return () => {
+    window.removeEventListener("online", handleOnline)
+    clearInterval(interval)
+  }
+
+}, [])
+
   return (
     <BrowserRouter>
       <AppRoutes />
