@@ -14,13 +14,17 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
+        id: '/',
         name: 'Maintenance & Supply Management App',
         short_name: 'MSMApp',
         description: 'Aplikasi Untuk Support Aktivitas Maintenance & Supply Management',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
         start_url: '/',
+        categories: ['business', 'productivity'],
         icons: [
           {
             src: 'icons/icon-192x192.png',
