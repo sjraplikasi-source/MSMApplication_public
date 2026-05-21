@@ -54,9 +54,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const sessionUser = data.session?.user;
       if (!mounted) return;
       if (sessionUser) {
-        await fetchUserProfile(sessionUser.id);
-      } else {
-        setLoading(false);
+  setUser({
+    id: sessionUser.id,
+    email: sessionUser.email || "",
+  });
+
+  setLoading(false);
+
+  fetchUserProfile(sessionUser.id);
       }
     })();
 
