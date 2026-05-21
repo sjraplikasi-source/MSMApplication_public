@@ -33,18 +33,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (id: string) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, email, name, role")
-      .eq("id", id)
-      .maybeSingle();
 
-    if (error) {
-      console.error("Gagal fetch user profile:", error.message);
-    }
-    if (data) setUser(data as UserType);
-    setLoading(false);
-  };
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, email, name, role")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Gagal fetch user profile:", error.message);
+    return;
+  }
+
+  // CEK apakah session masih aktif
+  const { data: sessionData } = await supabase.auth.getSession();
+
+  if (sessionData.session?.user?.id !== id) {
+    return;
+  }
+
+  if (data) {
+    setUser(prev => ({
+      ...prev,
+      ...data
+    }));
+  }
+};
 
   useEffect(() => {
     let mounted = true;
@@ -61,18 +75,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   setLoading(false);
 
-  fetchUserProfile(sessionUser.id);
-      }
+  void fetchUserProfile(sessionUser.id);
+} else {
+  setLoading(false);
+}
     })();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
+if (session?.user) {
+
+  setUser({
+    id: session.user.id,
+    email: session.user.email || "",
+  });
+
+  setLoading(false);
+
+  void fetchUserProfile(session.user.id);
+
+} else {
+  setUser(null);
+  setLoading(false);
+}
     });
 
     return () => {
@@ -82,19 +107,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setLoading(false);
-      throw new Error(error.message);
-    }
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      await fetchUserProfile(data.user.id);
-    } else {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    setLoading(false);
+    throw new Error(error.message);
+  }
+
+  // User & profile akan di-handle oleh onAuthStateChange
+};
 
   const registerWithProfile = async (
     email: string,
@@ -119,7 +145,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Gagal menambahkan pengguna ke tabel users: " + insertError.message);
     }
 
-    await fetchUserProfile(id);
+    setLoading(false);
+void fetchUserProfile(id);
   };
 
   // --- HAPUS TOKEN LOKAL TANPA MEMANGGIL ENDPOINT LOGOUT ---
@@ -147,7 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
-      setLoading(true);
+      
 
       // IMPORTANT: Jangan panggil supabase.auth.signOut() sama sekali,
       // supaya tidak ada request ke /auth/v1/logout (menghindari 403 session_not_found).
