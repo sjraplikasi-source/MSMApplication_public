@@ -9,12 +9,15 @@ import { addToQueue } from "./queueService"
 export async function safeInsert(table: string, data: any) {
 
   if (navigator.onLine) {
-    const { error } = await supabase
-      .from(table)
-      .insert(data)
+    const { data: inserted, error } = await supabase
+  .from(table)
+  .insert(data)
+  .select()
+  .single()
 
-    if (error) throw error
-    return
+if (error) throw error
+
+return inserted
   }
 
   await addToQueue("INSERT", {
