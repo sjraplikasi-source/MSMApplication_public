@@ -47,6 +47,8 @@ import AutoUpdateHandler from './components/AutoUpdateHandler';
 import { useEffect } from "react"
 import { syncQueue } from "./offline/syncService"
 
+import DocumentationPage from "@/pages/System/DocumentationPage";
+
 // Lazy load modul MineMaintenance
 const MineRouter = lazy(() => import("@/pages/MineMaintenance/MineRouter"));
 
@@ -130,6 +132,8 @@ function AppRoutes() {
 
         <Route path="/toolroom/*" element={<ProtectedRoute><Layout><ToolRoom /></Layout></ProtectedRoute>} />
         
+        <Route path="/system/documentation"element={<ProtectedRoute><Layout><DocumentationPage /></Layout></ProtectedRoute>}/>
+
         {/* ✅ Mine Maintenance Module */}
         <Route
           path="/mine-maintenance/*"

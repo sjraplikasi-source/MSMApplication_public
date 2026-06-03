@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Wrench, LogOut, ChevronDown, Bell, Menu, BarChart2,
-  ClipboardList, Settings, Users, UserPlus, CheckCircle, Calendar, ListChecks, Power, Zap, ChevronRight, BarChartHorizontal, Home
+  ClipboardList, Settings, Users, UserPlus, CheckCircle, Calendar, ListChecks, Power, Zap, ChevronRight, BarChartHorizontal, Home, BookOpen
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -64,16 +64,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // tempat tambah role
   const ROLE_ACCESS: Record<string,string[]> = {
     admin: ["*"], administrator: ["*"], superadmin: ["*"],
-    sm: ["/dashboard", "/supply/backlog"],
-    supply: ["/dashboard", "/supply/backlog"],
-    supplymanager: ["/dashboard", "/supply/backlog"],
-    supplymanagement: ["/dashboard", "/supply/backlog"],
-    engineer: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance"],
-    groupleader: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance"],
-    mechanic: ["/dashboard", "/reports", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom"],
-    planner: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
-    superintendent: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
-    supervisor: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog"],
+    sm: ["/dashboard", "/supply/backlog", "/system/documentation"],
+    supply: ["/dashboard", "/supply/backlog", "/system/documentation"],
+    supplymanager: ["/dashboard", "/supply/backlog", "/system/documentation"],
+    supplymanagement: ["/dashboard", "/supply/backlog", "/system/documentation"],
+    engineer: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/system/documentation"],
+    groupleader: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/system/documentation"],
+    mechanic: ["/dashboard", "/reports", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/system/documentation"],
+    planner: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog", "/system/documentation"],
+    superintendent: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog", "/system/documentation"],
+    supervisor: ["/dashboard", "/reports", "/validasi", "/pareto", "/download", "/Backlog", "/backlog", "/toolroom", "/mine-maintenance", "/supply/backlog", "/system/documentation"],
   };
   
   const matchPrefix = (prefix: string, target: string) => target === prefix || target.startsWith(prefix + "/");
@@ -134,6 +134,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: "/aktivasi", label: "User Activation", icon: Users },
   ];
   
+  const NAV_SYSTEM: NavItem[] = [
+  {
+    path: "/system/documentation",
+    label: "Documentation",
+    icon: BookOpen,
+  },
+];
+
   // --- Logika untuk Menampilkan Menu Sesuai Role ---
   const sidebarMenus = useMemo(() => {
     const menus = [];
@@ -141,10 +149,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (!isSupplyOnly) menus.push({ id: 'backlog', title: 'Backlog', items: NAV_BACKLOG.filter(item => canSee(item.path)) });
     if (!isSupplyOnly) menus.push({ id: 'mine', title: 'Mine Maintenance', items: NAV_MINE.filter(item => canSee(item.path)) });
     if (!isSupplyOnly) menus.push({ id: 'toolroom', title: 'Tool Room', items: NAV_TOOLROOM.filter(item => canSee(item.path)) });
+    
     if (isSupplyOnly || isAdmin) menus.push({ id: 'SM', title: 'Supply Management', items: NAV_SUPPLY.filter(item => canSee(item.path)) });
     // menus.push({ id: 'operational', title: 'Operational Performance', items: NAV_OPERATIONAL.filter(item => canSee(item.path)) });
     if (isAdmin) menus.push({ id: 'admin', title: 'Admin', items: NAV_ADMIN.filter(item => canSee(item.path)) });
+    menus.push({  id: 'system',  title: 'System',  items: NAV_SYSTEM.filter(item => canSee(item.path))});
     return menus.filter(menu => menu.items.length > 0);
+    
   }, [user, roleKey, isAdmin, isSupplyOnly]);
 
   useEffect(() => {
