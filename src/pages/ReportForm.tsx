@@ -90,7 +90,7 @@ const ReportForm = () => {
     const maxAllowedDelta = effectiveDays * 24;
 
     if (delta > maxAllowedDelta) {
-      return `Delta HM (${delta} jam) melebihi batas wajar (${maxAllowedDelta.toFixed(1)} jam untuk ${effectiveDays.toFixed(1)} hari)`;
+      return `Ingo Balong, Delta HM (${delta} jam) melebihi batas wajar (${maxAllowedDelta.toFixed(1)} jam untuk ${effectiveDays.toFixed(1)} hari)`;
     }
 
     return null;
