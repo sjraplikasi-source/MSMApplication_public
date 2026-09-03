@@ -28,7 +28,7 @@ type BacklogRow = {
 type SortBy = "date" | "unit_code" | "registration_code" | "problem" | "status" | "priority";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 500] as const;
 const STATUS_OPTIONS = ["all", "open", "draft", "validated", "reviewed", "closed", "rejected"] as const;
 const PART_STATUS_OPTIONS = ["all", "complete", "waiting"] as const;
 const SHUTDOWN_OPTIONS = ["all", "true", "false"] as const;
