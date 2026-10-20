@@ -282,7 +282,7 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Dashboard Backlog</h1>
-          <p className="text-sm text-gray-500">Ringkasan status dan tren backlog pemeliharaan.</p>
+          <p className="text-sm text-gray-500">Ringkasan status dan tren backlog.</p>
         </div>
         <div className="flex items-center gap-4 mt-4 sm:mt-0">
             <div className="flex flex-wrap items-center gap-2">
