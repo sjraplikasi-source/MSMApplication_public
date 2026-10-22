@@ -147,7 +147,26 @@ const BacklogList: React.FC = () => {
     setDateFrom(""); setDateTo(""); setSortBy("date"); setSortDir("desc"); setPageSize(20);
   };
 
-  const downloadExcelFull = async () => { await exportBacklogsExcel(); };
+  const downloadExcelFull = async () => {
+  if (downloading) return;
+
+  setDownloading(true);
+
+  try {
+    await exportBacklogsExcel();
+  } catch (error: unknown) {
+    console.error("Export backlog gagal:", error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Terjadi kesalahan saat export Backlog.";
+
+    window.alert(message);
+  } finally {
+    setDownloading(false);
+  }
+};
 
   const tableColumns = useMemo(() => [
     { key: 'date', header: 'Tanggal', render: (row: BacklogRow) => row.date ? new Date(row.date).toLocaleDateString() : "-" },

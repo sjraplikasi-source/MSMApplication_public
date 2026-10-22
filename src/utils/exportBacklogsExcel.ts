@@ -1,6 +1,11 @@
 // src/utils/exportBacklogsExcel.ts
+
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabase";
+
+// ============================================================
+// TYPES
+// ============================================================
 
 type BacklogRow = {
   id: string;
@@ -20,31 +25,271 @@ type BacklogRow = {
   created_by_user?: { name?: string | null } | null;
 };
 
-const fmtDate = (v?: string | null) =>
-  v ? new Date(v).toLocaleDateString() : "";
-const fmtDateTime = (v?: string | null) =>
-  v ? new Date(v).toLocaleString() : "";
+type ClosingRow = {
+  backlog_id: string;
+  closed_date: string | null;
+  mechanic_name: string | null;
+  created_at: string | null;
+};
 
-/** Ambil closing paling baru untuk masing-masing backlog_id */
-async function buildClosingMap(backlogIds: string[]) {
+type SparepartRow = {
+  backlog_id: string;
+  part_number: string | null;
+  part_name: string | null;
+  qty: number | null;
+  stock_status: string | null;
+  estimated_ready_date: string | null;
+  no_wr_pr: string | null;
+  no_po: string | null;
+  remarks: string | null;
+};
+
+type ToolRow = {
+  backlog_id: string;
+  tool_name: string | null;
+  specification: string | null;
+  qty: number | null;
+  remarks: string | null;
+};
+
+type ManpowerRow = {
+  backlog_id: string;
+  skill_required: string | null;
+  qty: number | null;
+  remarks: string | null;
+};
+
+type ShutdownRow = {
+  backlog_id: string;
+  activity_name: string | null;
+  qty: number | null;
+  remarks: string | null;
+};
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+// Maksimal 100 backlog ID per query detail.
+const EXPORT_BATCH_SIZE = 100;
+
+// Pengambilan daftar backlog dilakukan per 500 baris.
+const BACKLOG_PAGE_SIZE = 500;
+
+// ============================================================
+// DATE FORMAT
+// ============================================================
+
+const fmtDate = (value?: string | null): string => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString();
+};
+
+const fmtDateTime = (value?: string | null): string => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleString();
+};
+
+// ============================================================
+// FETCH DETAIL DATA IN BATCHES
+// ============================================================
+
+/**
+ * Mengambil data berdasarkan daftar backlog ID secara bertahap.
+ *
+ * Jika salah satu query gagal, proses export dihentikan
+ * agar file Excel tidak dibuat dengan data yang tidak lengkap.
+ */
+async function fetchInBatches<T>(
+  label: string,
+  ids: string[],
+  fetchBatch: (batchIds: string[]) => PromiseLike<any>
+): Promise<T[]> {
+  const result: T[] = [];
+
+  if (ids.length === 0) {
+    return result;
+  }
+
+  const totalBatches = Math.ceil(
+    ids.length / EXPORT_BATCH_SIZE
+  );
+
+  for (
+    let offset = 0;
+    offset < ids.length;
+    offset += EXPORT_BATCH_SIZE
+  ) {
+    const batchIds = ids.slice(
+      offset,
+      offset + EXPORT_BATCH_SIZE
+    );
+
+    const batchNumber =
+      Math.floor(offset / EXPORT_BATCH_SIZE) + 1;
+
+    const { data, error } = await fetchBatch(batchIds);
+
+    if (error) {
+      console.error(`Gagal mengambil ${label}:`, {
+        batch: batchNumber,
+        totalBatches,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+
+      throw new Error(
+        `Gagal export ${label}, batch ${batchNumber}/${totalBatches}: ` +
+        `${error.message || "Unknown Supabase error"}`
+      );
+    }
+
+    const batchData = (data ?? []) as T[];
+
+    result.push(...batchData);
+  }
+
+  console.info(
+    `Export ${label}: ${result.length} records dari ${ids.length} backlog ID`
+  );
+
+  return result;
+}
+
+// ============================================================
+// FETCH ALL BACKLOGS WITH PAGINATION
+// ============================================================
+
+/**
+ * Mengambil seluruh backlog, bukan hanya halaman pertama
+ * yang dikembalikan oleh Supabase.
+ */
+async function fetchAllBacklogs(): Promise<BacklogRow[]> {
+  const allBacklogs: BacklogRow[] = [];
+
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("backlogs")
+      .select(`
+        id,
+        registration_code,
+        unit_code,
+        problem,
+        date,
+        status,
+        priority,
+        need_sparepart,
+        need_tools,
+        need_manpower,
+        need_shutdown,
+        shutdown_required,
+        validated_at,
+        created_by_user:users!backlogs_created_by_fkey(name),
+        validated_by_user:users!backlogs_validated_by_fkey(name)
+      `)
+      .order("date", { ascending: false })
+      .order("id", { ascending: true })
+      .range(
+        offset,
+        offset + BACKLOG_PAGE_SIZE - 1
+      );
+
+    if (error) {
+      console.error("Gagal mengambil daftar backlog:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        offset,
+      });
+
+      throw new Error(
+        `Gagal mengambil daftar backlog: ${error.message}`
+      );
+    }
+
+    const pageRows = (data ?? []) as unknown as BacklogRow[];
+
+    if (pageRows.length === 0) {
+      break;
+    }
+
+    allBacklogs.push(...pageRows);
+
+    offset += pageRows.length;
+
+    if (pageRows.length < BACKLOG_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  console.info(
+    `Total backlog berhasil diambil: ${allBacklogs.length}`
+  );
+
+  return allBacklogs;
+}
+
+// ============================================================
+// BUILD CLOSING MAP
+// ============================================================
+
+/**
+ * Mengambil closing terbaru untuk setiap backlog_id.
+ */
+async function buildClosingMap(
+  backlogIds: string[]
+): Promise<
+  Map<
+    string,
+    {
+      closed_date: string | null;
+      mechanic_name: string | null;
+    }
+  >
+> {
   const map = new Map<
     string,
-    { closed_date?: string | null; mechanic_name?: string | null }
+    {
+      closed_date: string | null;
+      mechanic_name: string | null;
+    }
   >();
-  if (!backlogIds.length) return map;
 
-  const { data, error } = await supabase
-    .from("backlog_closings")
-    .select("backlog_id, closed_date, mechanic_name, created_at")
-    .in("backlog_id", backlogIds)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.warn("Gagal ambil closing:", error.message);
+  if (backlogIds.length === 0) {
     return map;
   }
 
-  for (const row of data || []) {
+  const closingRows = await fetchInBatches<ClosingRow>(
+    "Closing",
+    backlogIds,
+    (batchIds) =>
+      supabase
+        .from("backlog_closings")
+        .select(
+          "backlog_id, closed_date, mechanic_name, created_at"
+        )
+        .in("backlog_id", batchIds)
+        .order("created_at", { ascending: false })
+  );
+
+  // Setiap batch memiliki daftar backlog ID yang berbeda.
+  // Dalam satu batch, closing telah diurutkan terbaru dahulu.
+  for (const row of closingRows) {
     if (!map.has(row.backlog_id)) {
       map.set(row.backlog_id, {
         closed_date: row.closed_date ?? null,
@@ -52,56 +297,89 @@ async function buildClosingMap(backlogIds: string[]) {
       });
     }
   }
+
   return map;
 }
 
-/** Export semua backlog ke Excel multi-sheet, dengan kolom “Backlog Kode” di semua sheet detail. */
+// ============================================================
+// MAIN EXPORT FUNCTION
+// ============================================================
+
+/**
+ * Export seluruh backlog ke Excel multi-sheet.
+ *
+ * Sheets:
+ * 1. Backlogs
+ * 2. Spareparts
+ * 3. Tools
+ * 4. Manpower
+ * 5. Shutdown
+ * 6. Closing
+ */
 export async function exportBacklogsExcel(): Promise<void> {
-  // 1) Ambil semua backlog + info validator
-  const { data: allBacklogs, error: eB } = await supabase
-    .from("backlogs")
-    .select(`
-      id, registration_code, unit_code, problem, date, status, priority,
-      need_sparepart, need_tools, need_manpower, need_shutdown, shutdown_required,
-      validated_at, created_by_user:users!backlogs_created_by_fkey(name),
-      validated_by_user:users!backlogs_validated_by_fkey(name)
-    `)
-    .order("date", { ascending: false });
+  console.info("Memulai export Backlog ke Excel...");
 
-  if (eB) throw eB;
+  // ----------------------------------------------------------
+  // 1. Ambil seluruh backlog
+  // ----------------------------------------------------------
 
-  const backlogs = (allBacklogs || []) as BacklogRow[];
-  const ids = backlogs.map((b) => b.id);
+  const backlogs = await fetchAllBacklogs();
+
+  const ids = backlogs.map((backlog) => backlog.id);
+
   const codeMap = new Map<string, string>(
-    backlogs.map((b) => [b.id, b.registration_code || b.id])
+    backlogs.map(
+      (backlog) =>
+        [
+          backlog.id,
+          backlog.registration_code || backlog.id,
+        ] as [string, string]
+    )
   );
+
+  // ----------------------------------------------------------
+  // 2. Ambil closing terbaru
+  // ----------------------------------------------------------
+
   const closingMap = await buildClosingMap(ids);
 
-  // 2) Workbook
+  // ----------------------------------------------------------
+  // 3. Buat workbook
+  // ----------------------------------------------------------
+
   const wb = XLSX.utils.book_new();
 
-  // === Sheet 1: Backlogs (ringkasan)
-  const backlogsRows = backlogs.map((b) => {
-    const closing = closingMap.get(b.id);
+  // ==========================================================
+  // SHEET 1: BACKLOGS
+  // ==========================================================
+
+  const backlogsRows = backlogs.map((backlog) => {
+    const closing = closingMap.get(backlog.id);
+
     return [
-      fmtDate(b.date),
-      b.registration_code ?? "",
-      b.unit_code ?? "",
-      b.problem ?? "",
-      b.status ?? "",
-      b.priority ?? "Improve",
-      b.created_by_user?.name ?? "",
-      b.need_sparepart ? "Ya" : "Tidak",
-      b.need_tools ? "Ya" : "Tidak",
-      b.need_manpower ? "Ya" : "Tidak",
-      b.need_shutdown ? "Ya" : "Tidak",
-      b.need_shutdown ? (b.shutdown_required ? "Ya" : "Tidak") : "",
-      b.validated_by_user?.name ?? "",
-      fmtDateTime(b.validated_at),
+      fmtDate(backlog.date),
+      backlog.registration_code ?? "",
+      backlog.unit_code ?? "",
+      backlog.problem ?? "",
+      backlog.status ?? "",
+      backlog.priority ?? "Improve",
+      backlog.created_by_user?.name ?? "",
+      backlog.need_sparepart ? "Ya" : "Tidak",
+      backlog.need_tools ? "Ya" : "Tidak",
+      backlog.need_manpower ? "Ya" : "Tidak",
+      backlog.need_shutdown ? "Ya" : "Tidak",
+      backlog.need_shutdown
+        ? backlog.shutdown_required
+          ? "Ya"
+          : "Tidak"
+        : "",
+      backlog.validated_by_user?.name ?? "",
+      fmtDateTime(backlog.validated_at),
       fmtDate(closing?.closed_date ?? null),
       closing?.mechanic_name ?? "",
     ];
   });
+
   const wsBacklogs = XLSX.utils.aoa_to_sheet([
     [
       "Tanggal",
@@ -123,109 +401,246 @@ export async function exportBacklogsExcel(): Promise<void> {
     ],
     ...backlogsRows,
   ]);
-  XLSX.utils.book_append_sheet(wb, wsBacklogs, "Backlogs");
 
-  if (ids.length) {
-    // === Sheet 2: Spareparts
-    const { data: sp } = await supabase
-      .from("backlog_spareparts")
-      .select(
-        "backlog_id, part_number, part_name, qty, stock_status, estimated_ready_date, no_wr_pr, no_po, remarks"
-      )
-      .in("backlog_id", ids);
-    const wsSpares = XLSX.utils.aoa_to_sheet([
-      [
-        "Backlog Kode",
-        "Part Number",
-        "Part Name",
-        "Qty",
-        "Stock Status",
-        "Est. Ready",
-        "No WR/PR",
-        "No PO",
-        "Remarks",
-      ],
-      ...(sp || []).map((r: any) => [
-        codeMap.get(r.backlog_id) ?? r.backlog_id,
-        r.part_number ?? "",
-        r.part_name ?? "",
-        r.qty ?? "",
-        r.stock_status ?? "",
-        fmtDate(r.estimated_ready_date ?? null),
-        r.no_wr_pr ?? "",
-        r.no_po ?? "",
-        r.remarks ?? "",
-      ]),
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsSpares, "Spareparts");
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsBacklogs,
+    "Backlogs"
+  );
 
-    // === Sheet 3: Tools
-    const { data: tl } = await supabase
-      .from("backlog_tools")
-      .select("backlog_id, tool_name, specification, qty, remarks")
-      .in("backlog_id", ids);
-    const wsTools = XLSX.utils.aoa_to_sheet([
-      ["Backlog Kode", "Nama", "Spesifikasi", "Qty", "Remarks"],
-      ...(tl || []).map((r: any) => [
-        codeMap.get(r.backlog_id) ?? r.backlog_id,
-        r.tool_name ?? "",
-        r.specification ?? "",
-        r.qty ?? "",
-        r.remarks ?? "",
-      ]),
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsTools, "Tools");
+  // ==========================================================
+  // SHEET DETAIL
+  // ==========================================================
 
-    // === Sheet 4: Manpower
-    const { data: mp } = await supabase
-      .from("backlog_manpower")
-      .select("backlog_id, skill_required, qty, remarks")
-      .in("backlog_id", ids);
-    const wsMan = XLSX.utils.aoa_to_sheet([
-      ["Backlog Kode", "Skill/Nama", "Qty", "Remarks"],
-      ...(mp || []).map((r: any) => [
-        codeMap.get(r.backlog_id) ?? r.backlog_id,
-        r.skill_required ?? "",
-        r.qty ?? "",
-        r.remarks ?? "",
-      ]),
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsMan, "Manpower");
+  // Buat semua sheet detail meskipun belum ada backlog ID.
+  // Untuk daftar kosong, sheet akan berisi header saja.
 
-    // === Sheet 5: Shutdown
-    const { data: sd } = await supabase
-      .from("backlog_shutdown")
-      .select("backlog_id, activity_name, qty, remarks")
-      .in("backlog_id", ids);
-    const wsShutdown = XLSX.utils.aoa_to_sheet([
-      ["Backlog Kode", "Aktivitas", "Qty", "Remarks"],
-      ...(sd || []).map((r: any) => [
-        codeMap.get(r.backlog_id) ?? r.backlog_id,
-        r.activity_name ?? "",
-        r.qty ?? "",
-        r.remarks ?? "",
-      ]),
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsShutdown, "Shutdown");
+  // ----------------------------------------------------------
+  // SHEET 2: SPAREPARTS
+  // ----------------------------------------------------------
 
-    // === Sheet 6: Closing
-    const closingRows = Array.from(closingMap.entries()).map(
-      ([backlogId, c]) => [
-        codeMap.get(backlogId) ?? backlogId,
-        fmtDate(c.closed_date ?? null),
-        c.mechanic_name ?? "",
-      ]
-    );
-    const wsClosing = XLSX.utils.aoa_to_sheet([
-      ["Backlog Kode", "Tanggal Close", "Nama Mekanik"],
-      ...closingRows,
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsClosing, "Closing");
-  }
+  const spareparts = await fetchInBatches<SparepartRow>(
+    "Spareparts",
+    ids,
+    (batchIds) =>
+      supabase
+        .from("backlog_spareparts")
+        .select(`
+          backlog_id,
+          part_number,
+          part_name,
+          qty,
+          stock_status,
+          estimated_ready_date,
+          no_wr_pr,
+          no_po,
+          remarks
+        `)
+        .in("backlog_id", batchIds)
+  );
+
+  const wsSpares = XLSX.utils.aoa_to_sheet([
+    [
+      "Backlog Kode",
+      "Part Number",
+      "Part Name",
+      "Qty",
+      "Stock Status",
+      "Est. Ready",
+      "No WR/PR",
+      "No PO",
+      "Remarks",
+    ],
+    ...spareparts.map((row) => [
+      codeMap.get(row.backlog_id) ?? row.backlog_id,
+      row.part_number ?? "",
+      row.part_name ?? "",
+      row.qty ?? "",
+      row.stock_status ?? "",
+      fmtDate(row.estimated_ready_date),
+      row.no_wr_pr ?? "",
+      row.no_po ?? "",
+      row.remarks ?? "",
+    ]),
+  ]);
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsSpares,
+    "Spareparts"
+  );
+
+  // ----------------------------------------------------------
+  // SHEET 3: TOOLS
+  // ----------------------------------------------------------
+
+  const tools = await fetchInBatches<ToolRow>(
+    "Tools",
+    ids,
+    (batchIds) =>
+      supabase
+        .from("backlog_tools")
+        .select(`
+          backlog_id,
+          tool_name,
+          specification,
+          qty,
+          remarks
+        `)
+        .in("backlog_id", batchIds)
+  );
+
+  const wsTools = XLSX.utils.aoa_to_sheet([
+    [
+      "Backlog Kode",
+      "Nama",
+      "Spesifikasi",
+      "Qty",
+      "Remarks",
+    ],
+    ...tools.map((row) => [
+      codeMap.get(row.backlog_id) ?? row.backlog_id,
+      row.tool_name ?? "",
+      row.specification ?? "",
+      row.qty ?? "",
+      row.remarks ?? "",
+    ]),
+  ]);
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsTools,
+    "Tools"
+  );
+
+  // ----------------------------------------------------------
+  // SHEET 4: MANPOWER
+  // ----------------------------------------------------------
+
+  const manpower = await fetchInBatches<ManpowerRow>(
+    "Manpower",
+    ids,
+    (batchIds) =>
+      supabase
+        .from("backlog_manpower")
+        .select(`
+          backlog_id,
+          skill_required,
+          qty,
+          remarks
+        `)
+        .in("backlog_id", batchIds)
+  );
+
+  const wsManpower = XLSX.utils.aoa_to_sheet([
+    [
+      "Backlog Kode",
+      "Skill/Nama",
+      "Qty",
+      "Remarks",
+    ],
+    ...manpower.map((row) => [
+      codeMap.get(row.backlog_id) ?? row.backlog_id,
+      row.skill_required ?? "",
+      row.qty ?? "",
+      row.remarks ?? "",
+    ]),
+  ]);
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsManpower,
+    "Manpower"
+  );
+
+  // ----------------------------------------------------------
+  // SHEET 5: SHUTDOWN
+  // ----------------------------------------------------------
+
+  const shutdown = await fetchInBatches<ShutdownRow>(
+    "Shutdown",
+    ids,
+    (batchIds) =>
+      supabase
+        .from("backlog_shutdown")
+        .select(`
+          backlog_id,
+          activity_name,
+          qty,
+          remarks
+        `)
+        .in("backlog_id", batchIds)
+  );
+
+  const wsShutdown = XLSX.utils.aoa_to_sheet([
+    [
+      "Backlog Kode",
+      "Aktivitas",
+      "Qty",
+      "Remarks",
+    ],
+    ...shutdown.map((row) => [
+      codeMap.get(row.backlog_id) ?? row.backlog_id,
+      row.activity_name ?? "",
+      row.qty ?? "",
+      row.remarks ?? "",
+    ]),
+  ]);
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsShutdown,
+    "Shutdown"
+  );
+
+  // ----------------------------------------------------------
+  // SHEET 6: CLOSING
+  // ----------------------------------------------------------
+
+  const closingRows = Array.from(
+    closingMap.entries()
+  ).map(([backlogId, closing]) => [
+    codeMap.get(backlogId) ?? backlogId,
+    fmtDate(closing.closed_date),
+    closing.mechanic_name ?? "",
+  ]);
+
+  const wsClosing = XLSX.utils.aoa_to_sheet([
+    [
+      "Backlog Kode",
+      "Tanggal Close",
+      "Nama Mekanik",
+    ],
+    ...closingRows,
+  ]);
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    wsClosing,
+    "Closing"
+  );
+
+  // ----------------------------------------------------------
+  // 4. Download Excel
+  // ----------------------------------------------------------
 
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  XLSX.writeFile(wb, `Backlogs_${y}-${m}-${d}.xlsx`);
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  const fileName = `Backlogs_${year}-${month}-${day}.xlsx`;
+
+  XLSX.writeFile(wb, fileName);
+
+  console.info("Export berhasil:", {
+    fileName,
+    totalBacklogs: backlogs.length,
+    totalSpareparts: spareparts.length,
+    totalTools: tools.length,
+    totalManpower: manpower.length,
+    totalShutdown: shutdown.length,
+    totalClosing: closingRows.length,
+  });
 }
