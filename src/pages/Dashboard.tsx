@@ -48,25 +48,31 @@ type ReportData = {
 
 // --- Komponen UI (tidak berubah) ---
 const KpiCard = ({ title, value, icon: Icon, color, onClick }) => (
-  <div
-    className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer"
+  <button
+    type="button"
+    className="flex w-full min-w-0 items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-sm transition-all hover:border-blue-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:gap-4 sm:p-4"
     onClick={onClick}
   >
     <div className={`p-3 rounded-full ${color}`}>
       <Icon className="h-6 w-6 text-white" />
     </div>
-    <div>
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
+    <div className="min-w-0">
+      <p className="text-xs text-gray-500 sm:text-sm">{title}</p>
+      <p className="break-words text-xl font-bold text-gray-800 sm:text-2xl">{value}</p>
     </div>
-  </div>
+  </button>
 );
 
-const ChartContainer = ({ title, children, isLoading }) => (
-  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-    <h3 className="text-md font-semibold text-gray-700 mb-4">{title}</h3>
-    <div style={{ width: '100%', height: 300 }}>
-      {isLoading ? <div className="flex justify-center items-center h-full text-gray-500">Memuat data...</div> : children}
+const ChartContainer = ({ title, children, isLoading, isMobile = false }) => (
+  <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+    <h3 className="mb-3 text-sm font-semibold text-gray-700 sm:mb-4 sm:text-base">{title}</h3>
+    <div
+      className="w-full min-w-0"
+      style={{
+        height: isMobile ? 'clamp(320px, 90vw, 360px)' : 'clamp(300px, 32vw, 360px)',
+      }}
+    >
+      {isLoading ? <div className="flex h-full items-center justify-center text-sm text-gray-500">Memuat data...</div> : children}
     </div>
   </div>
 );
@@ -85,6 +91,19 @@ export default function App() {
   const [paretoTab, setParetoTab] = useState('equipment');
   const [dateRange, setDateRange] = useState('last_7_days');
   const [loading, setLoading] = useState(true);
+  const [isMobileChart, setIsMobileChart] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  );
+
+  // Keep chart axis density aligned with the Tailwind mobile breakpoint (sm = 640px).
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 639px)');
+    const updateChartViewport = () => setIsMobileChart(mediaQuery.matches);
+    updateChartViewport();
+    mediaQuery.addEventListener('change', updateChartViewport);
+
+    return () => mediaQuery.removeEventListener('change', updateChartViewport);
+  }, []);
 
   // State untuk data dari Supabase
   const [kpiData, setKpiData] = useState<KpiData>({ laporanMasuk: 0, laporanDitutup: 0, avgDowntime: '0 Jam', menungguValidasi: 0 });
@@ -203,47 +222,75 @@ export default function App() {
     fetchData();
   }, [dateRange]);
 
-  // --- KOMPONEN PARETO CHART DIPERBARUI ---
+  // Pareto chart adapts axis labels and margins for narrow mobile screens.
   const ParetoChart = ({ data }: { data: ParetoData[] }) => (
-    <ResponsiveContainer>
-      <ComposedChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart
+        data={data}
+        margin={{
+          top: isMobileChart ? 24 : 8,
+          right: isMobileChart ? 2 : 18,
+          left: isMobileChart ? -24 : -10,
+          bottom: isMobileChart ? 54 : 42,
+        }}
+      >
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} fontSize={12} />
-        {/* Y-Axis Kiri (Downtime) */}
+        <XAxis
+          dataKey="name"
+          angle={isMobileChart ? -40 : -45}
+          textAnchor="end"
+          interval={isMobileChart ? 'preserveStartEnd' : 0}
+          height={isMobileChart ? 86 : 72}
+          tick={{ fontSize: isMobileChart ? 9 : 11 }}
+          tickMargin={isMobileChart ? 6 : 8}
+          tickFormatter={(value: string) =>
+            isMobileChart && value.length > 13 ? `${value.slice(0, 12)}…` : value
+          }
+          tickLine={!isMobileChart}
+        />
+        {/* Y-Axis kiri: label disembunyikan di mobile untuk menghemat lebar plot. */}
         <YAxis
           yAxisId="left"
           orientation="left"
-          label={{ value: 'Total Downtime (Jam)', angle: -90, position: 'insideLeft' }}
-          fontSize={12}
+          width={isMobileChart ? 32 : 52}
+          label={isMobileChart ? undefined : { value: 'Downtime (Jam)', angle: -90, position: 'insideLeft', fontSize: 10 }}
+          tick={{ fontSize: isMobileChart ? 9 : 11 }}
+          tickLine={!isMobileChart}
         />
-        {/* Y-Axis Kanan (Persentase) */}
+        {/* Y-Axis kanan: cukup 0, 50, 100 pada mobile; detail tetap tersedia di tooltip. */}
         <YAxis
           yAxisId="right"
           orientation="right"
           domain={[0, 100]}
-          ticks={[0, 20, 40, 60, 80, 100]}
-          label={{ value: 'Cumulative %', angle: 90, position: 'insideRight' }}
-          fontSize={12}
+          ticks={isMobileChart ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]}
+          width={isMobileChart ? 28 : 54}
+          label={isMobileChart ? undefined : { value: 'Cumulative %', angle: 90, position: 'insideRight', fontSize: 10 }}
+          tick={{ fontSize: isMobileChart ? 9 : 11 }}
+          tickLine={!isMobileChart}
         />
         <Tooltip
+          contentStyle={{ fontSize: isMobileChart ? 11 : 12, borderRadius: 8 }}
           formatter={(value: number, name: string) => {
-            if (name === "Cumulative %") return [`${value.toFixed(2)}%`, name];
-            if (name === "Downtime (Jam)") return [`${value.toFixed(2)} hours`, name];
+            if (name === 'Cumulative %') return [`${value.toFixed(2)}%`, name];
+            if (name === 'Downtime (Jam)') return [`${value.toFixed(2)} hours`, name];
             return [value, name];
           }}
         />
-        <Legend />
+        <Legend
+          verticalAlign={isMobileChart ? 'top' : 'bottom'}
+          align={isMobileChart ? 'right' : 'center'}
+          iconSize={isMobileChart ? 8 : 10}
+          wrapperStyle={{ fontSize: isMobileChart ? 10 : 12 }}
+        />
         <ReferenceLine y={80} yAxisId="right" stroke="green" strokeDasharray="5 5" />
-        {/* Bar untuk Downtime */}
         <Bar yAxisId="left" dataKey="downtime" fill="#ef4444" name="Downtime (Jam)" />
-        {/* Line untuk Kumulatif */}
         <Line
           yAxisId="right"
           type="monotone"
           dataKey="cumulativePercent"
-          stroke="#ff7300" // Warna oranye
+          stroke="#ff7300"
           name="Cumulative %"
-          strokeWidth={3}
+          strokeWidth={isMobileChart ? 2 : 3}
           dot={false}
         />
       </ComposedChart>
@@ -253,16 +300,16 @@ export default function App() {
 
 
   return (
-    <div className="bg-gray-50 p-4 sm:p-6 min-h-screen font-sans">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div className="min-w-0 w-full bg-gray-50 p-0 font-sans">
+      <div className="mb-5 flex min-w-0 flex-col items-start justify-between gap-3 sm:mb-6 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard Daily Report</h1>
-          <p className="text-sm text-gray-500">Analisis aktivitas perbaikan dan performa tim.</p>
+          <h1 className="text-xl font-bold leading-tight text-gray-800 sm:text-2xl">Dashboard Daily Report</h1>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 sm:text-sm">Analisis aktivitas perbaikan dan performa tim.</p>
         </div>
-        <div className="flex items-center gap-2 mt-4 sm:mt-0">
-          <Filter size={16} className="text-gray-500" />
+        <div className="mt-1 flex w-full items-center gap-2 sm:mt-0 sm:w-auto">
+          <Filter size={16} className="shrink-0 text-gray-500" />
           <select
-            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
             value={dateRange}
             onChange={e => setDateRange(e.target.value)}
           >
@@ -274,7 +321,7 @@ export default function App() {
       </div>
 
       {/* KPI Cards (tidak berubah) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="mb-5 grid min-w-0 grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <KpiCard title="Laporan Masuk" value={kpiData.laporanMasuk} icon={Wrench} color="bg-blue-500" onClick={() => navigate('/reports')} />
         <KpiCard title="Laporan Ditutup" value={kpiData.laporanDitutup} icon={CheckCircle} color="bg-green-500" onClick={() => navigate('/reports?status=approved')} />
         <KpiCard title="Rata-rata Downtime" value={kpiData.avgDowntime} icon={Clock} color="bg-yellow-500" onClick={() => navigate('/reports')} />
@@ -282,23 +329,27 @@ export default function App() {
       </div>
 
       {/* Pareto Chart Container (tidak berubah, tapi akan me-render chart baru) */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6">
-        <div className="flex border-b mb-4">
-          <button onClick={() => setParetoTab('equipment')} className={`px-4 py-2 text-sm font-medium ${paretoTab === 'equipment' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+      <div className="mb-5 min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:mb-6 sm:p-4">
+        <div className="mb-3 flex min-w-0 border-b sm:mb-4">
+          <button onClick={() => setParetoTab('equipment')} className={`min-w-0 flex-1 px-2 py-2 text-xs font-medium sm:flex-none sm:px-4 sm:text-sm ${paretoTab === 'equipment' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
             By Equipment
           </button>
-          <button onClick={() => setParetoTab('problem')} className={`px-4 py-2 text-sm font-medium ${paretoTab === 'problem' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+          <button onClick={() => setParetoTab('problem')} className={`min-w-0 flex-1 px-2 py-2 text-xs font-medium sm:flex-none sm:px-4 sm:text-sm ${paretoTab === 'problem' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
             By Problem Type
           </button>
         </div>
-        <ChartContainer title={`Pareto R&M Activity ${paretoTab === 'equipment' ? 'by Equipment' : 'by Problem Type'}`} isLoading={loading}>
+        <ChartContainer
+          title={`Pareto R&M Activity ${paretoTab === 'equipment' ? 'by Equipment' : 'by Problem Type'}`}
+          isLoading={loading}
+          isMobile={isMobileChart}
+        >
           <ParetoChart data={paretoTab === 'equipment' ? paretoEquipment : paretoProblem} />
         </ChartContainer>
       </div>
 
       {/* Grid Bawah (tidak berubah) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4 lg:col-span-1">
           <h3 className="text-md font-semibold text-gray-700 mb-4">Leaderboard Mekanik (Bulan Ini)</h3>
           {loading ? <div className="text-sm text-gray-500">Memuat data...</div> :
             <ul className="space-y-3">
@@ -311,11 +362,11 @@ export default function App() {
             </ul>
           }
         </div>
-        <div className="lg:col-span-2 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <h3 className="text-md font-semibold text-gray-700 mb-4">Aktivitas Laporan Terbaru</h3>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4 lg:col-span-2">
+          <h3 className="mb-4 text-sm font-semibold text-gray-700 sm:text-base">Aktivitas Laporan Terbaru</h3>
           {loading ? <div className="text-sm text-gray-500">Memuat data...</div> :
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+              <table className="w-full min-w-[620px] text-sm">
                 <tbody>
                   {recentReports.length > 0 ? recentReports.map(report => (
                     <tr key={report.id} className="border-b last:border-b-0 hover:bg-gray-50">

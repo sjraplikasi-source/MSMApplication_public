@@ -1,24 +1,24 @@
 // src/pages/HomePage.tsx
 
 import React, { useEffect, useState } from 'react';
-import { 
-    Wrench,           
-    ClipboardList,    
-    Warehouse,        
-    Shield,          
+import {
+    Wrench,
+    ClipboardList,
+    Warehouse,
+    Shield,
     ArrowRight,
     PlusCircle,
     Loader2,
     ListPlus,
     HardHat,
-    Tool,
     Hammer,
-    CheckCircle
+    CheckCircle,
+    Plus,
+    X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Button } from '../components/ui/button';
 
 // Tipe data untuk summary
 interface SummaryData {
@@ -38,17 +38,18 @@ const HomePage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // State untuk data dan loading
     const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isFabOpen, setIsFabOpen] = useState(false);
 
-    // Fungsi untuk mengambil semua data summary dari Supabase
+    // Mengambil ringkasan backlog dan supply dari Supabase.
+    // Query dan perhitungan dipertahankan dari implementasi sebelumnya.
     useEffect(() => {
         const fetchSummaryData = async () => {
             setLoading(true);
             try {
                 const today = new Date().toISOString().split('T')[0];
-                const openStatuses = '("closed", "completed")'; // Status yang dianggap selesai
+                const openStatuses = '("closed", "completed")';
 
                 const { count: todayCount } = await supabase
                     .from('backlogs')
@@ -69,14 +70,14 @@ const HomePage: React.FC = () => {
 
                 const { data: waitingForPartsData, error: rpcError } = await supabase.rpc('get_waiting_for_parts_count');
                 if (rpcError) throw rpcError;
-                
+
                 setSummaryData({
                     rmActivity: { today: todayCount ?? 0, overdue: overdueCount ?? 0 },
                     backlog: { highPriority: highPriorityCount ?? 0 },
-                    supply: { waitingForParts: waitingForPartsData ?? 0 }
+                    supply: { waitingForParts: waitingForPartsData ?? 0 },
                 });
             } catch (error) {
-                console.error("Gagal mengambil data summary:", error);
+                console.error('Gagal mengambil data summary:', error);
                 setSummaryData({
                     rmActivity: { today: 0, overdue: 0 },
                     backlog: { highPriority: 0 },
@@ -90,211 +91,276 @@ const HomePage: React.FC = () => {
         fetchSummaryData();
     }, []);
 
-    const handleNavigate = (path: string) => navigate(path);
+    // Menutup menu aksi dengan tombol Escape.
+    useEffect(() => {
+        if (!isFabOpen) return;
 
-    // Tampilan saat loading
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsFabOpen(false);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFabOpen]);
+
+    // Jika drawer navigasi mobile dibuka dari Layout, tutup FAB agar keduanya
+    // tidak tampil bersamaan dan tidak saling menutupi.
+    useEffect(() => {
+        const closeFabWhenSidebarOpens = () => setIsFabOpen(false);
+        window.addEventListener('msm:mobile-sidebar-open', closeFabWhenSidebarOpens);
+
+        return () => {
+            window.removeEventListener('msm:mobile-sidebar-open', closeFabWhenSidebarOpens);
+        };
+    }, []);
+
+    const handleNavigate = (path: string) => {
+        setIsFabOpen(false);
+        navigate(path);
+    };
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-screen">
-                <Loader2 className="animate-spin text-blue-600" size={48} />
-                <p className="ml-4 text-lg text-gray-600">Memuat data dashboard...</p>
+            <div className="flex min-h-[50vh] items-center justify-center gap-3 px-4 text-center">
+                <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+                <p className="text-base text-gray-600">Memuat data dashboard...</p>
             </div>
         );
     }
 
+    const quickActions = [
+        {
+            label: 'Borrow Tool',
+            path: '/toolroom/borrow',
+            icon: ClipboardList,
+            color: 'bg-indigo-600 hover:bg-indigo-700',
+            title: 'Form Peminjaman',
+        },
+        {
+            label: 'Return Tool',
+            path: '/toolroom/return-tools',
+            icon: CheckCircle,
+            color: 'bg-green-600 hover:bg-green-700',
+            title: 'Form Pengembalian',
+        },
+        {
+            label: 'Add Backlog',
+            path: '/Backlog/input',
+            icon: ListPlus,
+            color: 'bg-blue-600 hover:bg-blue-700',
+            title: 'Add Backlog',
+        },
+        {
+            label: 'Add Report',
+            path: '/reports/new',
+            icon: PlusCircle,
+            color: 'bg-blue-600 hover:bg-blue-700',
+            title: 'Add Report',
+        },
+    ];
+
     return (
-        <div className="p-6 sm:p-8 bg-gray-50 min-h-screen relative">
-            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">
+        <div className="relative min-w-0 w-full bg-gray-50 pb-24 md:pb-0">
+            <header className="mb-6 flex flex-col items-start justify-between gap-2 sm:mb-8 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold leading-tight text-gray-800 sm:text-3xl">
                         Selamat Datang, {user?.name || user?.email || 'Pengguna'}!
                     </h1>
-                    <p className="mt-1 text-gray-500">
+                    <p className="mt-2 text-sm leading-relaxed text-gray-500 sm:text-base">
                         Berikut adalah ringkasan aktivitas dari sistem manajemen Anda.
                     </p>
                 </div>
             </header>
 
-            <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                
+            <main className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4 xl:gap-6">
                 {/* 1. R&M Activity */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/dashboard')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-orange-100 p-3 rounded-lg"><Wrench className="text-orange-500" size={28} /></div>
-                        <ArrowRight className="text-gray-400 group-hover:text-orange-500 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-orange-100 p-3"><Wrench className="text-orange-500" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-orange-500" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">R&M Activity</h3>
-                        <p className="text-sm text-gray-500 mt-1">Jadwal & Laporan Perbaikan</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">R&M Activity</h3>
+                        <p className="mt-1 text-sm text-gray-500">Jadwal &amp; Laporan Perbaikan</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 space-y-2 text-sm">
-                        <div className="flex justify-between">
+                    <div className="mt-5 space-y-2 border-t pt-4 text-sm sm:mt-6">
+                        <div className="flex justify-between gap-3">
                             <span className="text-gray-600">Jadwal Hari Ini:</span>
-                            <span className="font-bold text-orange-600">{summaryData?.rmActivity.today}</span>
+                            <span className="font-bold tabular-nums text-orange-600">{summaryData?.rmActivity.today ?? 0}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-3">
                             <span className="text-gray-600">Terlewat:</span>
-                            <span className="font-bold text-red-600">{summaryData?.rmActivity.overdue}</span>
+                            <span className="font-bold tabular-nums text-red-600">{summaryData?.rmActivity.overdue ?? 0}</span>
                         </div>
                     </div>
-                </div>
+                </button>
 
                 {/* 2. Backlog Management */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/backlog/dashboard')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-red-100 p-3 rounded-lg"><ClipboardList className="text-red-500" size={28} /></div>
-                        <ArrowRight className="text-gray-400 group-hover:text-red-500 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-red-100 p-3"><ClipboardList className="text-red-500" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-red-500" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Backlog</h3>
-                        <p className="text-sm text-gray-500 mt-1">Manajemen Pekerjaan Tertunda</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">Backlog</h3>
+                        <p className="mt-1 text-sm text-gray-500">Manajemen Pekerjaan Tertunda</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-5 flex justify-between gap-3 border-t pt-4 text-sm sm:mt-6">
                         <span className="text-gray-600">Prioritas Tinggi:</span>
-                        <span className="font-bold text-red-600">{summaryData?.backlog.highPriority}</span>
+                        <span className="font-bold tabular-nums text-red-600">{summaryData?.backlog.highPriority ?? 0}</span>
                     </div>
-                </div>
+                </button>
 
                 {/* 3. Supply Management */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/supply/backlog')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-green-100 p-3 rounded-lg"><Warehouse className="text-green-500" size={28} /></div>
-                        <ArrowRight className="text-gray-400 group-hover:text-green-500 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-green-100 p-3"><Warehouse className="text-green-500" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-green-500" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Supply Management</h3>
-                        <p className="text-sm text-gray-500 mt-1">Stok & Pengadaan Sparepart</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">Supply Management</h3>
+                        <p className="mt-1 text-sm text-gray-500">Stok &amp; Pengadaan Sparepart</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-5 flex justify-between gap-3 border-t pt-4 text-sm sm:mt-6">
                         <span className="text-gray-600">Menunggu Part:</span>
-                        <span className="font-bold text-green-600">{summaryData?.supply.waitingForParts}</span>
+                        <span className="font-bold tabular-nums text-green-600">{summaryData?.supply.waitingForParts ?? 0}</span>
                     </div>
-                </div>
+                </button>
 
                 {/* 4. Mine Maintenance */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/mine-maintenance')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-blue-100 p-3 rounded-lg">
-                            <HardHat className="text-blue-600" size={28} />
-                        </div>
-                        <ArrowRight className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-blue-100 p-3"><HardHat className="text-blue-600" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-blue-600" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Mine Maintenance</h3>
-                        <p className="text-sm text-gray-500 mt-1">Equipment, Komponen & Hour Meter</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">Mine Maintenance</h3>
+                        <p className="mt-1 text-sm text-gray-500">Equipment, Komponen &amp; Hour Meter</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-5 flex justify-between gap-3 border-t pt-4 text-sm sm:mt-6">
                         <span className="text-gray-600">Status:</span>
                         <span className="font-bold text-blue-600">Online</span>
                     </div>
-                </div>
+                </button>
 
-                {/* 5. 🧰 Tool Room */}
-                <div 
+                {/* 5. Tool Room */}
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/toolroom/dashboard')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-indigo-100 p-3 rounded-lg">
-                            <Hammer className="text-indigo-600" size={28} />
-                        </div>
-                        <ArrowRight className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-indigo-100 p-3"><Hammer className="text-indigo-600" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-indigo-600" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Tool Room</h3>
-                        <p className="text-sm text-gray-500 mt-1">Peminjaman, Pengembalian & Stok Alat</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">Tool Room</h3>
+                        <p className="mt-1 text-sm text-gray-500">Peminjaman, Pengembalian &amp; Stok Alat</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-5 flex justify-between gap-3 border-t pt-4 text-sm sm:mt-6">
                         <span className="text-gray-600">Status:</span>
                         <span className="font-bold text-indigo-600">Active</span>
                     </div>
-                </div>
+                </button>
 
                 {/* 6. Administrator */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => handleNavigate('/konfigurasi')}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                    className="group w-full min-w-0 rounded-xl bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 sm:p-6"
                 >
-                    <div className="flex justify-between items-start">
-                        <div className="bg-gray-100 p-3 rounded-lg"><Shield className="text-gray-500" size={28} /></div>
-                        <ArrowRight className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                    <div className="flex items-start justify-between">
+                        <div className="rounded-lg bg-gray-100 p-3"><Shield className="text-gray-500" size={28} /></div>
+                        <ArrowRight className="text-gray-400 transition-colors group-hover:text-gray-600" />
                     </div>
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold text-gray-800">Administrator</h3>
-                        <p className="text-sm text-gray-500 mt-1">Pengaturan Pengguna & Sistem</p>
+                        <h3 className="text-lg font-bold text-gray-800 sm:text-xl">Administrator</h3>
+                        <p className="mt-1 text-sm text-gray-500">Pengaturan Pengguna &amp; Sistem</p>
                     </div>
-                    <div className="mt-6 border-t pt-4 flex justify-between text-sm">
+                    <div className="mt-5 flex justify-between gap-3 border-t pt-4 text-sm sm:mt-6">
                         <span className="text-gray-600">Akses:</span>
                         <span className="font-bold text-gray-800">Level Admin</span>
                     </div>
-                </div>
+                </button>
             </main>
-            
-            {/* 🔘 Floating Buttons */}
-            <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2">
-                {/* Add Tool Borrow */}
-                <button
-                    onClick={() => handleNavigate('/toolroom/borrow')}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Form Peminjaman"
-                >
-                    <ClipboardList size={24} />
-                    <span className="ml-2 text-sm font-medium">Borrow Tool</span>
-                </button>
 
-                {/* Return Tool */}
-                <button
-                    onClick={() => handleNavigate('/toolroom/return-tools')}
-                    className="bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Form Pengembalian"
-                >
-                    <CheckCircle size={24} />
-                    <span className="ml-2 text-sm font-medium">Return Tool</span>
-                </button>
+            {/* Footer berada di alur halaman, bukan di dalam elemen fixed. */}
+            <footer className="mt-7 text-right text-xs text-blue-300 sm:mt-8 sm:text-sm">
+                Site MSM, PT Sumbawa Jutaraya
+            </footer>
 
-                {/* Add Backlog */}
-                <button
-                    onClick={() => handleNavigate('/Backlog/input')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Add Backlog"
-                >
-                    <ListPlus size={24} />
-                    <span className="ml-2 text-sm font-medium">Add Backlog</span>
-                </button>
+            {/* Desktop: empat shortcut tetap terlihat seperti desain sebelumnya. */}
+            <div className="fixed bottom-6 right-6 z-30 hidden flex-col items-end gap-2 md:flex">
+                {quickActions.map(({ label, path, icon: Icon, color, title }) => (
+                    <button
+                        key={label}
+                        type="button"
+                        onClick={() => handleNavigate(path)}
+                        className={`${color} flex items-center justify-center rounded-full p-3 text-white shadow-lg transition-transform duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2`}
+                        title={title}
+                    >
+                        <Icon size={24} />
+                        <span className="ml-2 text-sm font-medium">{label}</span>
+                    </button>
+                ))}
+            </div>
 
-                {/* Add Report */}
-                <button
-                    onClick={() => handleNavigate('/reports/new')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-300 transform hover:scale-105"
-                    title="Add Report"
-                >
-                    <PlusCircle size={24} />
-                    <span className="ml-2 text-sm font-medium">Add Report</span>
-                </button>
+            {/* Mobile: expandable FAB agar shortcut tidak menutupi dashboard. */}
+            <div className="fixed right-4 z-40 md:hidden" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+                {isFabOpen && (
+                    <button
+                        type="button"
+                        aria-label="Tutup menu aksi"
+                        className="fixed inset-0 z-30 cursor-default bg-slate-950/25 backdrop-blur-[1px] transition-opacity"
+                        onClick={() => setIsFabOpen(false)}
+                    />
+                )}
 
-              
-                <div>
-                    <p className="mt-1 text-blue-200">
-                        Site MSM, PT Sumbawa Jutaraya
-                    </p>
+                <div className="relative z-40 flex flex-col items-end gap-3">
+                    {isFabOpen && quickActions.map(({ label, path, icon: Icon, color, title }) => (
+                        <button
+                            key={label}
+                            type="button"
+                            onClick={() => handleNavigate(path)}
+                            className="relative z-40 flex min-h-11 items-center gap-3 rounded-full bg-white py-1.5 pl-4 pr-1.5 text-sm font-semibold text-gray-800 shadow-lg ring-1 ring-black/5 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
+                            title={title}
+                        >
+                            <span>{label}</span>
+                            <span className={`${color} flex h-10 w-10 items-center justify-center rounded-full text-white`}>
+                                <Icon size={20} />
+                            </span>
+                        </button>
+                    ))}
+
+                    <button
+                        type="button"
+                        aria-label={isFabOpen ? 'Tutup shortcut' : 'Buka shortcut'}
+                        aria-expanded={isFabOpen}
+                        onClick={() => setIsFabOpen((current) => !current)}
+                        className="relative z-40 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-xl transition-transform duration-200 hover:bg-violet-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2"
+                    >
+                        {isFabOpen ? <X size={25} /> : <Plus size={26} />}
+                    </button>
                 </div>
-
             </div>
         </div>
     );
 };
-
 
 export default HomePage;
