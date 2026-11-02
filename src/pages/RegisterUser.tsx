@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 
 const RegisterUser = () => {
   const [form, setForm] = useState({
@@ -21,49 +22,92 @@ const RegisterUser = () => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
 
-    try {
-      // 1. Daftarkan user ke Supabase Auth
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
+
+  try {
+    // 1. Pastikan Admin masih memiliki session aktif
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (!session) {
+      throw new Error(
+        'Session Admin tidak ditemukan. Silakan login kembali.'
+      );
+    }
+
+    // 2. Kirim permintaan registrasi ke Edge Function
+    const { data, error: functionError } =
+      await supabase.functions.invoke('register-user', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          name: form.name.trim(),
+          nrp: form.nrp.trim(),
+          username: form.username.trim(),
+          role: form.role,
+        },
       });
 
-      if (signUpError || !signUpData?.user?.id) {
-        throw new Error(signUpError?.message || 'Gagal mendaftarkan akun');
+    // 3. Tangani error dari backend
+    if (functionError) {
+      console.error('REGISTER USER FUNCTION ERROR:', functionError);
+
+      if (functionError instanceof FunctionsHttpError) {
+        const errorBody = await functionError.context
+          .json()
+          .catch(() => null);
+
+        throw new Error(
+          errorBody?.error ||
+          errorBody?.message ||
+          functionError.message
+        );
       }
 
-      const authId = signUpData.user.id;
-
-      // 2. Masukkan data tambahan ke tabel users
-      const { error: insertError } = await supabase.from('users').insert([
-        {
-          id: authId,
-          email: form.email,
-          name: form.name,
-          nrp: form.nrp,
-          role: form.role,
-          username: form.username,
-        },
-      ]);
-
-      if (insertError) {
-        console.error('Gagal menyisipkan ke tabel users:', insertError);
-        throw new Error('Gagal menyimpan data pengguna');
-      }
-
-      alert('Registrasi berhasil!');
-      navigate('/login');
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan saat registrasi');
-    } finally {
-      setLoading(false);
+      throw functionError;
     }
-  };
+
+    if (!data?.success) {
+      throw new Error(
+        data?.error || 'Registrasi pengguna gagal.'
+      );
+    }
+
+    // 4. Registrasi berhasil
+    console.log('USER REGISTERED:', data);
+
+    alert('Pengguna berhasil didaftarkan!');
+
+    // Kembali ke halaman sebelumnya tanpa logout Admin
+    navigate(-1);
+
+  } catch (err: unknown) {
+    console.error('REGISTRATION ERROR:', err);
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Terjadi kesalahan saat registrasi'
+    );
+
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="max-w-md mx-auto p-4">
@@ -78,7 +122,7 @@ const RegisterUser = () => {
           <option value="mechanic">Mechanic</option>
           <option value="group_leader">Group Leader</option>
           <option value="planner">Planner</option>
-          <option value="superintendent">Supervisor</option>
+          <option value="Supervisor">Supervisor</option>
           <option value="superintendent">Superintendent</option>
           <option value="admin">Admin</option>
           <option value="SM">SM</option>
